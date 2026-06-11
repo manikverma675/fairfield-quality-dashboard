@@ -107,11 +107,13 @@ def _build_context() -> str:
         sections.append(
             f"CUSTOMER COMPLAINTS: {cs['total']} total | {cs['open']} open | {cs['closed']} closed | "
             f"Median closure {cs['median_closure_days']:.1f} days "
-            f"(note: complaint rate cannot be computed — no shipment/order denominator in the data)\n"
+            f"(definition: FPC | NCR profile cases assigned to Sheri King; "
+            f"complaint rate cannot be computed — no shipment/order denominator in the data)\n"
             f"Status breakdown: {comp_status_str}\n"
             f"Open backlog aging (days bucket:open cases): {comp_aging_str}\n"
             f"Top companies by complaint count: {comp_co_str}\n"
-            f"MONTHLY TREND — complaints created (YYYY-MM:count): {comp_str}"
+            f"MONTHLY TREND — open complaints created per month (YYYY-MM:count): {comp_str}\n"
+            f"MONTHLY TREND — closed complaints created per month (YYYY-MM:count): {_fmt_monthly(comp_created, 'Closed Cases')}"
         )
     except Exception as exc:
         sections.append(f"NCR / COMPLAINTS: data unavailable ({exc})")

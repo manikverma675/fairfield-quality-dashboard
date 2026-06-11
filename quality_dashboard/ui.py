@@ -144,7 +144,7 @@ def dual_line_chart(
         .encode(
             x=alt.X("Period:T", title=None),
             y=alt.Y("Value:Q", title="Cases"),
-            color=alt.Color("Series:N", scale=color_scale, legend=alt.Legend(orient="top-left")),
+            color=alt.Color("Series:N", scale=color_scale, legend=alt.Legend(orient="bottom")),
             tooltip=[
                 alt.Tooltip("Period:T", title="Period"),
                 alt.Tooltip("Series:N", title="Series"),
