@@ -160,6 +160,11 @@ def render_chat_widget() -> None:
 <meta charset="utf-8">
 <style>
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+html, body {{
+    width: 100%;
+    height: 100%;
+    position: relative;
+}}
 body {{
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: transparent;
@@ -168,9 +173,9 @@ body {{
 
 /* FAB */
 #fab {{
-    position: fixed;
-    bottom: 4rem;
-    right: 1rem;
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
     width: 54px;
     height: 54px;
     border-radius: 50%;
@@ -191,7 +196,7 @@ body {{
 /* Chat card */
 #card {{
     display: none;
-    position: fixed;
+    position: absolute;
     bottom: 0;
     right: 0;
     width: 100%;
