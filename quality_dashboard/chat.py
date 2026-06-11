@@ -534,7 +534,31 @@ async function sendMessage() {{
 </body>
 </html>"""
 
-    # Right-align the widget: put it in the last column
-    _, right = st.columns([3, 1])
-    with right:
-        components.html(html, height=70)
+    # Pull the chat iframe out of normal page flow and pin it to the viewport.
+    # This app has no other iframes (Altair charts render as inline SVG), so
+    # targeting the iframe's container is safe.
+    st.markdown(
+        """
+        <style>
+        .stApp [data-testid="stElementContainer"]:has(> iframe),
+        .stApp .element-container:has(> iframe) {
+            position: fixed !important;
+            bottom: 0 !important;
+            right: 1.5rem !important;
+            width: 400px !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            z-index: 1000000 !important;
+        }
+        .stApp iframe[title="streamlit_app"],
+        .stApp [data-testid="stElementContainer"]:has(> iframe) iframe,
+        .stApp .element-container:has(> iframe) iframe {
+            background: transparent !important;
+            border: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    components.html(html, height=70)
