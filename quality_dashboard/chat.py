@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import streamlit as st
-import streamlit.components.v1 as components
 from openai import OpenAI
 
 from quality_dashboard.config import (
@@ -214,76 +213,49 @@ def _chat_dialog() -> None:
             st.rerun()
 
 
-_FLOAT_JS = """
-<script>
-(function () {
-    function applyFloat() {
-        try {
-            const doc = window.parent.document;
-            const btns = doc.querySelectorAll('button');
-            for (const btn of btns) {
-                const txt = btn.innerText || btn.textContent || '';
-                if (txt.trim() === '💬') {
-                    const wrap = btn.closest('[data-testid="stButton"]') || btn.parentElement;
-                    Object.assign(wrap.style, {
-                        position: 'fixed',
-                        bottom: '2rem',
-                        right: '2rem',
-                        zIndex: '99999',
-                        margin: '0',
-                    });
-                    Object.assign(btn.style, {
-                        width: '3.5rem',
-                        height: '3.5rem',
-                        borderRadius: '50%',
-                        backgroundColor: '#d97706',
-                        color: 'white',
-                        fontSize: '1.5rem',
-                        border: 'none',
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-                        padding: '0',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        lineHeight: '1',
-                    });
-                    btn.title = 'Ask AI about your quality data';
-                    btn.onmouseenter = () => {
-                        btn.style.backgroundColor = '#b45309';
-                        btn.style.transform = 'scale(1.08)';
-                        btn.style.transition = 'all 0.15s';
-                    };
-                    btn.onmouseleave = () => {
-                        btn.style.backgroundColor = '#d97706';
-                        btn.style.transform = 'scale(1)';
-                    };
-                    break;
-                }
-            }
-        } catch (e) { /* cross-origin or not ready */ }
-    }
-
-    // Run immediately and after short delay (Streamlit renders async)
-    applyFloat();
-    setTimeout(applyFloat, 400);
-    setTimeout(applyFloat, 1200);
-
-    // Re-apply whenever Streamlit rerenders the DOM
-    try {
-        const observer = new MutationObserver(() => setTimeout(applyFloat, 100));
-        observer.observe(window.parent.document.body, { childList: true, subtree: true });
-    } catch (e) {}
-})();
-</script>
+_FLOAT_CSS = """
+<style>
+/* Floating chat button — injected into Streamlit's page head */
+#fpc-chat-fab-wrap {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 99999;
+}
+#fpc-chat-fab-wrap button {
+    width: 3.5rem !important;
+    height: 3.5rem !important;
+    border-radius: 50% !important;
+    background-color: #d97706 !important;
+    color: white !important;
+    font-size: 1.5rem !important;
+    border: none !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.28) !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+    transition: background-color 0.15s, transform 0.15s !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: unset !important;
+}
+#fpc-chat-fab-wrap button:hover {
+    background-color: #b45309 !important;
+    transform: scale(1.08) !important;
+}
+#fpc-chat-fab-wrap button p {
+    font-size: 1.5rem !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+}
+</style>
 """
 
 
 def render_chat_widget() -> None:
     """Inject the floating chat button + dialog. Call once from App.py after pg.run()."""
-    # JavaScript to float the button (runs in same-origin iframe)
-    components.html(_FLOAT_JS, height=0)
-
-    # The actual Streamlit button — JS above moves it to fixed bottom-right
-    if st.button("💬", key="fpc_chat_fab"):
+    st.markdown(_FLOAT_CSS, unsafe_allow_html=True)
+    st.markdown('<div id="fpc-chat-fab-wrap">', unsafe_allow_html=True)
+    if st.button("💬", key="fpc_chat_fab", help="Ask AI about your quality data"):
         _chat_dialog()
+    st.markdown("</div>", unsafe_allow_html=True)
