@@ -31,12 +31,29 @@ scrap/quarantine, Amazon external failure claims).
 """
 
 
+def _fmt_monthly(df, value_col: str, fmt: str = "{:.0f}", period_col: str = "Period") -> str:
+    import pandas as pd
+
+    parts = []
+    for _, row in df.iterrows():
+        period = pd.Timestamp(row[period_col]).strftime("%Y-%m")
+        parts.append(f"{period}:{fmt.format(row[value_col])}")
+    return ", ".join(parts)
+
+
 def _build_context() -> str:
     sections: list[str] = []
 
     try:
         from quality_dashboard.data_loaders import load_ncr_cases
-        from quality_dashboard.calculations import filter_ncr_profile, ncr_summary, ncr_company_summary
+        from quality_dashboard.calculations import (
+            filter_ncr_profile,
+            ncr_summary,
+            ncr_company_summary,
+            ncr_created_trend,
+            ncr_closure_trend,
+            ncr_status_summary,
+        )
 
         cases = load_ncr_cases(NCR_CASES_FILE)
         ncr = filter_ncr_profile(cases, "FPC | NCR")
@@ -48,21 +65,36 @@ def _build_context() -> str:
             f"{r['Company']} ({r['Cases']} cases, {r['Open Cases']} open)"
             for _, r in top_co.iterrows()
         )
+        ncr_status = ncr_status_summary(ncr)
+        status_str = ", ".join(f"{r['Status']}: {r['Cases']}" for _, r in ncr_status.iterrows())
+
+        ncr_created = ncr_created_trend(ncr, "Monthly")
+        ncr_closure = ncr_closure_trend(ncr, "Monthly")
+        created_str = _fmt_monthly(ncr_created, "Created Cases")
+        closure_str = _fmt_monthly(ncr_closure, "Median Closure Days", "{:.0f}")
+
         sections.append(
             f"NCR CASES: {ns['total']} total | {ns['open']} open | {ns['closed']} closed | "
             f"Median closure {ns['median_closure_days']:.1f} days | Avg open age {ns['avg_age_days']:.1f} days\n"
-            f"Top companies by NCR count: {top_str}"
+            f"Status breakdown: {status_str}\n"
+            f"Top companies by NCR count: {top_str}\n"
+            f"MONTHLY TREND — NCRs created (YYYY-MM:count): {created_str}\n"
+            f"MONTHLY TREND — median closure days (YYYY-MM:days): {closure_str}"
         )
+
+        comp_created = ncr_created_trend(complaints, "Monthly")
+        comp_str = _fmt_monthly(comp_created, "Created Cases")
         sections.append(
             f"CUSTOMER COMPLAINTS: {cs['total']} total | {cs['open']} open | {cs['closed']} closed | "
-            f"Median closure {cs['median_closure_days']:.1f} days"
+            f"Median closure {cs['median_closure_days']:.1f} days\n"
+            f"MONTHLY TREND — complaints created (YYYY-MM:count): {comp_str}"
         )
     except Exception as exc:
         sections.append(f"NCR / COMPLAINTS: data unavailable ({exc})")
 
     try:
         from quality_dashboard.data_loaders import load_scrap_data
-        from quality_dashboard.calculations import scrap_summary
+        from quality_dashboard.calculations import scrap_summary, scrap_rate_trend
 
         scrap = load_scrap_data(SCRAP_FILE)
         ss = scrap_summary(scrap, "Confirmed Scrap")
@@ -73,19 +105,24 @@ def _build_context() -> str:
             .head(5)
         )
         top_str = ", ".join(f"{i} ({v:,.0f} units)" for i, v in top_scrap.items())
+        scrap_monthly = scrap_rate_trend(scrap, "Monthly")
+        confirmed_str = _fmt_monthly(scrap_monthly, "Confirmed Scrap")
+        quar_str = _fmt_monthly(scrap_monthly, "Into Quarantine")
         sections.append(
             f"SCRAP / QUARANTINE: {ss['confirmed_scrap']:,.0f} confirmed scrap units | "
             f"{ss['into_quarantine']:,.0f} into quarantine | "
             f"{ss['quarantine_balance']:,.0f} quarantine balance | "
             f"{ss['transactions']:,} transactions across {ss['items']:,} items\n"
-            f"Top scrap items: {top_str}"
+            f"Top scrap items: {top_str}\n"
+            f"MONTHLY TREND — confirmed scrap units (YYYY-MM:units): {confirmed_str}\n"
+            f"MONTHLY TREND — into quarantine units (YYYY-MM:units): {quar_str}"
         )
     except Exception as exc:
         sections.append(f"SCRAP: data unavailable ({exc})")
 
     try:
         from quality_dashboard.data_loaders import load_defect_data
-        from quality_dashboard.calculations import weight_summary, weight_item_summary
+        from quality_dashboard.calculations import weight_summary, weight_item_summary, weight_trend
 
         meas = load_defect_data(DEFECT_FILE)
         ws = weight_summary(meas)
@@ -94,6 +131,8 @@ def _build_context() -> str:
             f"{r['Assembly Item']} (avg abs variance {r['Average Absolute Variance']:.3f})"
             for _, r in top_items.iterrows()
         )
+        wt_monthly = weight_trend(meas, "Monthly")
+        wt_str = _fmt_monthly(wt_monthly, "Average Absolute Variance", "{:.3f}") if not wt_monthly.empty else "n/a"
         sections.append(
             f"WEIGHT INSPECTION: {ws['measurements']:,} measurements | "
             f"{ws['comparable_measurements']:,} with expected weight | "
@@ -101,7 +140,8 @@ def _build_context() -> str:
             f"Max abs variance {ws['maximum_absolute_variance']:.3f}\n"
             f"Within range: {ws['within_range']:,} | Below expected: {ws['below_expected']:,} | "
             f"Above expected: {ws['above_expected']:,}\n"
-            f"Top items by variance: {top_str}"
+            f"Top items by variance: {top_str}\n"
+            f"MONTHLY TREND — avg absolute weight variance (YYYY-MM:variance): {wt_str}"
         )
     except Exception as exc:
         sections.append(f"WEIGHT INSPECTION: data unavailable ({exc})")
@@ -371,7 +411,7 @@ body {{
             <div id="header-dot"></div>
             <div>
                 <h3>FPC Quality Assistant</h3>
-                <p>Powered by DeepSeek</p>
+                <p>Online</p>
             </div>
         </div>
         <button id="close-btn" onclick="closeChat()">✕</button>
