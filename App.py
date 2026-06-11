@@ -1,5 +1,6 @@
 import streamlit as st
 
+from quality_dashboard.chat import render_chat_widget
 from quality_dashboard.config import (
     DEFECT_FILE,
     EXTERNAL_FAILURE_FILE,
@@ -43,3 +44,4 @@ pg = st.navigation([
     st.Page("pages/5_External_Failure_Cost.py", title="External Failure Cost"),
 ])
 pg.run()
+render_chat_widget()
