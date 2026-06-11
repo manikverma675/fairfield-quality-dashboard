@@ -1,4 +1,3 @@
-import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -18,9 +17,9 @@ from quality_dashboard.ui import (
     CHART_BLUE,
     CHART_ORANGE,
     bar_chart,
+    dual_line_chart,
     empty_state,
     file_missing,
-    period_line_chart,
     render_header,
 )
 
@@ -92,15 +91,11 @@ tab_trend, tab_backlog, tab_records = st.tabs(["Trend", "Backlog", "Records"])
 with tab_trend:
     trend = ncr_created_trend(filtered, grain)
     st.altair_chart(
-        period_line_chart(
+        dual_line_chart(
             trend,
-            "Created Cases",
+            ["Open Cases", "Closed Cases"],
             f"Complaints by {grain.lower()} period",
-            color=CHART_BLUE,
-            extra_tooltips=[
-                alt.Tooltip("Open Cases:Q", format=","),
-                alt.Tooltip("Closed Cases:Q", format=","),
-            ],
+            colors=[CHART_ORANGE, CHART_BLUE],
         ),
         width="stretch",
     )

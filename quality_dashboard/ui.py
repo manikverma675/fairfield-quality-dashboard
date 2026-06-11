@@ -128,6 +128,33 @@ def period_line_chart(
     )
 
 
+def dual_line_chart(
+    data: pd.DataFrame,
+    series_cols: list[str],
+    title: str,
+    *,
+    colors: list[str] | None = None,
+) -> alt.Chart:
+    palette = colors or [CHART_BLUE, CHART_ORANGE, CHART_TEAL, CHART_RED]
+    melted = data.melt(id_vars="Period", value_vars=series_cols, var_name="Series", value_name="Value")
+    color_scale = alt.Scale(domain=series_cols, range=palette[: len(series_cols)])
+    return (
+        alt.Chart(melted)
+        .mark_line(point=True, strokeWidth=2.5)
+        .encode(
+            x=alt.X("Period:T", title=None),
+            y=alt.Y("Value:Q", title="Cases"),
+            color=alt.Color("Series:N", scale=color_scale, legend=alt.Legend(orient="top-left")),
+            tooltip=[
+                alt.Tooltip("Period:T", title="Period"),
+                alt.Tooltip("Series:N", title="Series"),
+                alt.Tooltip("Value:Q", title="Cases", format=","),
+            ],
+        )
+        .properties(title=title, height=340)
+    )
+
+
 def empty_state(message: str) -> None:
     st.warning(message)
     st.stop()
