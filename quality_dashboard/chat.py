@@ -53,6 +53,7 @@ def _build_context() -> str:
             ncr_created_trend,
             ncr_closure_trend,
             ncr_status_summary,
+            open_case_aging,
         )
 
         cases = load_ncr_cases(NCR_CASES_FILE)
@@ -67,6 +68,8 @@ def _build_context() -> str:
         )
         ncr_status = ncr_status_summary(ncr)
         status_str = ", ".join(f"{r['Status']}: {r['Cases']}" for _, r in ncr_status.iterrows())
+        ncr_aging = open_case_aging(ncr)
+        aging_str = ", ".join(f"{r['Age Bucket']}d:{r['Cases']}" for _, r in ncr_aging.iterrows())
 
         ncr_created = ncr_created_trend(ncr, "Monthly")
         ncr_closure = ncr_closure_trend(ncr, "Monthly")
@@ -77,16 +80,29 @@ def _build_context() -> str:
             f"NCR CASES: {ns['total']} total | {ns['open']} open | {ns['closed']} closed | "
             f"Median closure {ns['median_closure_days']:.1f} days | Avg open age {ns['avg_age_days']:.1f} days\n"
             f"Status breakdown: {status_str}\n"
+            f"Open backlog aging (days bucket:open cases): {aging_str}\n"
             f"Top companies by NCR count: {top_str}\n"
             f"MONTHLY TREND — NCRs created (YYYY-MM:count): {created_str}\n"
             f"MONTHLY TREND — median closure days (YYYY-MM:days): {closure_str}"
         )
 
+        comp_status = ncr_status_summary(complaints)
+        comp_status_str = ", ".join(f"{r['Status']}: {r['Cases']}" for _, r in comp_status.iterrows())
+        comp_co = ncr_company_summary(complaints, limit=5)
+        comp_co_str = ", ".join(
+            f"{r['Company']} ({r['Cases']} cases, {r['Open Cases']} open)" for _, r in comp_co.iterrows()
+        )
+        comp_aging = open_case_aging(complaints)
+        comp_aging_str = ", ".join(f"{r['Age Bucket']}d:{r['Cases']}" for _, r in comp_aging.iterrows())
         comp_created = ncr_created_trend(complaints, "Monthly")
         comp_str = _fmt_monthly(comp_created, "Created Cases")
         sections.append(
             f"CUSTOMER COMPLAINTS: {cs['total']} total | {cs['open']} open | {cs['closed']} closed | "
-            f"Median closure {cs['median_closure_days']:.1f} days\n"
+            f"Median closure {cs['median_closure_days']:.1f} days "
+            f"(note: complaint rate cannot be computed — no shipment/order denominator in the data)\n"
+            f"Status breakdown: {comp_status_str}\n"
+            f"Open backlog aging (days bucket:open cases): {comp_aging_str}\n"
+            f"Top companies by complaint count: {comp_co_str}\n"
             f"MONTHLY TREND — complaints created (YYYY-MM:count): {comp_str}"
         )
     except Exception as exc:
@@ -105,6 +121,9 @@ def _build_context() -> str:
             .head(5)
         )
         top_str = ", ".join(f"{i} ({v:,.0f} units)" for i, v in top_scrap.items())
+        conf_rate = (
+            ss["confirmed_scrap"] / ss["into_quarantine"] if ss["into_quarantine"] else float("nan")
+        )
         scrap_monthly = scrap_rate_trend(scrap, "Monthly")
         confirmed_str = _fmt_monthly(scrap_monthly, "Confirmed Scrap")
         quar_str = _fmt_monthly(scrap_monthly, "Into Quarantine")
@@ -112,17 +131,26 @@ def _build_context() -> str:
             f"SCRAP / QUARANTINE: {ss['confirmed_scrap']:,.0f} confirmed scrap units | "
             f"{ss['into_quarantine']:,.0f} into quarantine | "
             f"{ss['quarantine_balance']:,.0f} quarantine balance | "
+            f"Overall confirmation rate {conf_rate:.1%} (confirmed scrap / into quarantine) | "
             f"{ss['transactions']:,} transactions across {ss['items']:,} items\n"
             f"Top scrap items: {top_str}\n"
             f"MONTHLY TREND — confirmed scrap units (YYYY-MM:units): {confirmed_str}\n"
-            f"MONTHLY TREND — into quarantine units (YYYY-MM:units): {quar_str}"
+            f"MONTHLY TREND — into quarantine units (YYYY-MM:units): {quar_str}\n"
+            f"Note: per-period confirmation rate can exceed 100% because items quarantined in "
+            f"one month are often confirmed/disposed in a later month."
         )
     except Exception as exc:
         sections.append(f"SCRAP: data unavailable ({exc})")
 
     try:
         from quality_dashboard.data_loaders import load_defect_data
-        from quality_dashboard.calculations import weight_summary, weight_item_summary, weight_trend
+        from quality_dashboard.calculations import (
+            weight_summary,
+            weight_item_summary,
+            weight_trend,
+            weight_work_order_summary,
+            weight_inspector_summary,
+        )
 
         meas = load_defect_data(DEFECT_FILE)
         ws = weight_summary(meas)
@@ -130,6 +158,18 @@ def _build_context() -> str:
         top_str = ", ".join(
             f"{r['Assembly Item']} (avg abs variance {r['Average Absolute Variance']:.3f})"
             for _, r in top_items.iterrows()
+        )
+        wo = weight_work_order_summary(meas, limit=5)
+        wo_str = ", ".join(
+            f"{r['Assembly Item']}|{r['Work Order']} (avg abs var {r['Average Absolute Variance']:.3f}, "
+            f"{int(r['Measurements'])} meas)"
+            for _, r in wo.iterrows()
+        )
+        insp = weight_inspector_summary(meas)
+        insp_str = ", ".join(
+            f"{r['Inspector']} (avg abs var {r['Average Absolute Variance']:.3f}, {int(r['Measurements'])} meas)"
+            for _, r in insp.iterrows()
+            if r["Inspector"]
         )
         wt_monthly = weight_trend(meas, "Monthly")
         wt_str = _fmt_monthly(wt_monthly, "Average Absolute Variance", "{:.3f}") if not wt_monthly.empty else "n/a"
@@ -141,6 +181,8 @@ def _build_context() -> str:
             f"Within range: {ws['within_range']:,} | Below expected: {ws['below_expected']:,} | "
             f"Above expected: {ws['above_expected']:,}\n"
             f"Top items by variance: {top_str}\n"
+            f"Worst work orders by variance: {wo_str}\n"
+            f"Inspector performance (by avg abs variance): {insp_str}\n"
             f"MONTHLY TREND — avg absolute weight variance (YYYY-MM:variance): {wt_str}"
         )
     except Exception as exc:
@@ -148,7 +190,7 @@ def _build_context() -> str:
 
     try:
         from quality_dashboard.data_loaders import load_external_failure_data
-        from quality_dashboard.calculations import external_failure_summary
+        from quality_dashboard.calculations import external_failure_summary, defective_damage_summary
 
         ext = load_external_failure_data(EXTERNAL_FAILURE_FILE)
         es = external_failure_summary(ext.top_claims, ext.defective_damaged)
@@ -167,12 +209,25 @@ def _build_context() -> str:
             .head(5)
         )
         items_str = ", ".join(f"{i} (${v:,.0f})" for i, v in top_items.items())
+        dept_rows = ext.department_summary.sort_values("Claim Amount", ascending=False)
+        dept_str = ", ".join(
+            f"{r['Department Description']} (${r['Claim Amount']:,.0f})" for _, r in dept_rows.iterrows()
+        )
+        dd = defective_damage_summary(ext.defective_damaged, limit=5)
+        dd_str = ", ".join(
+            f"{r['Item Description']} (${r['Total Claim $']:,.0f}, {r['Total Units']:,.0f} units)"
+            for _, r in dd.iterrows()
+        )
         sections.append(
-            f"EXTERNAL FAILURE (AMAZON CLAIMS): dept total ${dept_total:,.2f} | "
-            f"line-item total ${es['total_claims']:,.2f} | {es['claim_rows']:,} claim lines | "
+            f"EXTERNAL FAILURE (AMAZON CLAIMS): dept total ${dept_total:,.2f} (authoritative, full reported total) | "
+            f"line-item total ${es['total_claims']:,.2f} (detail sheet only) | {es['claim_rows']:,} claim lines | "
             f"Defect/Damage ${es['defect_damage_cost']:,.2f} ({es['defect_damage_units']:,.0f} units)\n"
+            f"The ${dept_total - es['total_claims']:,.0f} gap between dept total and line-item total is claims "
+            f"not itemized in the detail sheet.\n"
+            f"Claim cost by department: {dept_str}\n"
             f"Top claim reasons: {reasons_str}\n"
-            f"Top claimed items: {items_str}"
+            f"Top claimed items: {items_str}\n"
+            f"Top defective/damaged items: {dd_str}"
         )
     except Exception as exc:
         sections.append(f"EXTERNAL FAILURE: data unavailable ({exc})")
