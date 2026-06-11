@@ -4,7 +4,7 @@ import streamlit as st
 
 from quality_dashboard.calculations import (
     filter_by_date,
-    filter_ncr_profile,
+    filter_complaints,
     ncr_company_summary,
     ncr_created_trend,
     ncr_status_summary,
@@ -35,7 +35,7 @@ def cached_cases() -> pd.DataFrame:
 if not NCR_CASES_FILE.exists():
     file_missing(NCR_CASES_FILE)
 
-complaints = filter_ncr_profile(cached_cases(), "FPC | Customer Support")
+complaints = filter_complaints(cached_cases())
 if complaints.empty:
     empty_state("No customer complaint cases were found in the source file.")
 

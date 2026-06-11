@@ -55,6 +55,7 @@ def _build_context() -> str:
         from quality_dashboard.data_loaders import load_ncr_cases
         from quality_dashboard.calculations import (
             filter_ncr_profile,
+            filter_complaints,
             ncr_summary,
             ncr_company_summary,
             ncr_created_trend,
@@ -65,7 +66,7 @@ def _build_context() -> str:
 
         cases = load_ncr_cases(NCR_CASES_FILE)
         ncr = filter_ncr_profile(cases, "FPC | NCR")
-        complaints = filter_ncr_profile(cases, "FPC | Customer Support")
+        complaints = filter_complaints(cases)
         ns = ncr_summary(ncr)
         cs = ncr_summary(complaints)
         top_co = ncr_company_summary(ncr, limit=5)

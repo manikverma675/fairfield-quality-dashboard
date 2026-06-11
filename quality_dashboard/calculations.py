@@ -32,6 +32,13 @@ def filter_ncr_profile(cases: pd.DataFrame, profile: str) -> pd.DataFrame:
     return cases[cases["Profile"].eq(profile)].copy()
 
 
+def filter_complaints(cases: pd.DataFrame) -> pd.DataFrame:
+    if cases.empty:
+        return pd.DataFrame(columns=cases.columns)
+    mask = cases["Profile"].eq("FPC | NCR") & cases["Assigned To"].eq("Sheri King")
+    return cases[mask].copy()
+
+
 def ncr_summary(cases: pd.DataFrame) -> dict[str, float]:
     if cases.empty:
         return {
