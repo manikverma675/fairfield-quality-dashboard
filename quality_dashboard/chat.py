@@ -33,6 +33,8 @@ knowledge, coding, other companies, personal topics), politely decline in your o
 them back to the quality data — no need for a canned phrase.
 - Be direct and concise (usually 2–5 sentences); expand only when asked for detail. Lead with the \
 answer, not a disclaimer.
+- Write in clean, readable prose. Light **bold** for key numbers is fine; avoid headings, tables, \
+and long bullet lists in such a small chat window.
 """
 
 
@@ -240,9 +242,13 @@ def _build_context() -> str:
     return "\n\n".join(sections)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def _cached_context() -> str:
-    return _build_context()
+    # Build once per browser session and reuse on reruns. Using session_state
+    # (not st.cache_data) means a hard refresh always rebuilds with the latest
+    # code/data — no stale context lingering across deploys.
+    if "fpc_chat_context" not in st.session_state:
+        st.session_state["fpc_chat_context"] = _build_context()
+    return st.session_state["fpc_chat_context"]
 
 
 def render_chat_widget() -> None:
@@ -386,6 +392,15 @@ body {{
     border: 1px solid #e7e5e4;
     border-bottom-left-radius: 4px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}}
+.ai .bubble strong {{ font-weight: 700; color: #1c1917; }}
+.ai .bubble code {{
+    background: #f5f5f4;
+    border: 1px solid #e7e5e4;
+    border-radius: 4px;
+    padding: 0 4px;
+    font-size: 0.78rem;
+    font-family: ui-monospace, monospace;
 }}
 .sender {{
     font-size: 0.68rem;
@@ -533,6 +548,29 @@ function scrollBottom() {{
     m.scrollTop = m.scrollHeight;
 }}
 
+function escapeHtml(s) {{
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}}
+
+function mdToHtml(t) {{
+    // Escape first so any tags in the text are neutralized, then apply light markdown.
+    let h = escapeHtml(t);
+    h = h.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');   // **bold**
+    h = h.replace(/`([^`]+)`/g, '<code>$1</code>');                // `code`
+    h = h.replace(/^[\\t ]*[-*] (.+)$/gm, '• $1');                  // - bullets
+    h = h.replace(/^[\\t ]*#{{1,6}}\\s*(.+)$/gm, '<strong>$1</strong>'); // # headers
+    h = h.replace(/\\n/g, '<br>');                                 // line breaks
+    return h;
+}}
+
+function setContent(bubble, role, text) {{
+    if (role === 'user') {{
+        bubble.textContent = text;
+    }} else {{
+        bubble.innerHTML = mdToHtml(text);
+    }}
+}}
+
 function addBubble(role, text) {{
     const msgs = document.getElementById('messages');
     const row = document.createElement('div');
@@ -542,7 +580,7 @@ function addBubble(role, text) {{
     sender.textContent = role === 'user' ? 'You' : 'Assistant';
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    bubble.textContent = text;
+    setContent(bubble, role, text);
     row.appendChild(sender);
     row.appendChild(bubble);
     msgs.appendChild(row);
@@ -625,7 +663,7 @@ async function sendMessage() {{
                     const token = JSON.parse(data)?.choices?.[0]?.delta?.content;
                     if (token) {{
                         full += token;
-                        bubble.textContent = full;
+                        bubble.innerHTML = mdToHtml(full);
                         scrollBottom();
                     }}
                 }} catch(e) {{}}
