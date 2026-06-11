@@ -400,20 +400,32 @@ const SYSTEM_PROMPT = {system_prompt_js};
 const history = [];
 
 function resizeFrame(h) {{
-    window.parent.postMessage({{ type: 'streamlit:setFrameHeight', height: h }}, '*');
+    // Primary: directly resize the srcdoc iframe (same-origin, always works)
+    try {{
+        const f = window.frameElement;
+        if (f) {{
+            f.style.height = h + 'px';
+            f.style.maxHeight = h + 'px';
+        }}
+    }} catch(e) {{}}
+    // Fallback: Streamlit's official resize protocol
+    try {{
+        window.parent.postMessage({{ type: 'streamlit:setFrameHeight', height: h }}, '*');
+    }} catch(e) {{}}
 }}
 
 function openChat() {{
     document.getElementById('fab').style.display = 'none';
     document.getElementById('card').classList.add('open');
-    resizeFrame(520);
-    setTimeout(() => document.getElementById('user-input').focus(), 100);
+    resizeFrame(600);
+    setTimeout(() => resizeFrame(600), 50);
+    setTimeout(() => document.getElementById('user-input').focus(), 120);
 }}
 
 function closeChat() {{
     document.getElementById('card').classList.remove('open');
     document.getElementById('fab').style.display = 'flex';
-    resizeFrame(70);
+    resizeFrame(80);
 }}
 
 function scrollBottom() {{
@@ -545,7 +557,7 @@ async function sendMessage() {{
             position: fixed !important;
             bottom: 0 !important;
             right: 1.5rem !important;
-            width: 400px !important;
+            width: 420px !important;
             height: auto !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -561,4 +573,4 @@ async function sendMessage() {{
         """,
         unsafe_allow_html=True,
     )
-    components.html(html, height=70)
+    components.html(html, height=80)
