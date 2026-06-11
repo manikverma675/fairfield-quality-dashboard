@@ -169,7 +169,7 @@ body {{
 /* FAB */
 #fab {{
     position: fixed;
-    bottom: 1rem;
+    bottom: 4rem;
     right: 1rem;
     width: 54px;
     height: 54px;
@@ -408,7 +408,7 @@ function setFrameSize(open) {{
         f.style.borderRadius = '16px 16px 0 0';
         f.style.boxShadow = '0 -6px 40px rgba(0,0,0,0.16)';
     }} else {{
-        f.style.bottom = '1.5rem';
+        f.style.bottom = '4rem';
         f.style.right = '1.5rem';
         f.style.width = '62px';
         f.style.height = '62px';
