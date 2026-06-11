@@ -164,7 +164,6 @@ body {{
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: transparent;
     overflow: hidden;
-    pointer-events: none;
 }}
 
 /* FAB */
@@ -172,7 +171,6 @@ body {{
     position: fixed;
     bottom: 4rem;
     right: 1rem;
-    pointer-events: auto;
     width: 54px;
     height: 54px;
     border-radius: 50%;
@@ -198,7 +196,6 @@ body {{
     right: 0;
     width: 100%;
     height: 100%;
-    pointer-events: auto;
     background: #fff;
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -6px 40px rgba(0,0,0,0.16);
@@ -397,15 +394,21 @@ const API_KEY = {api_key_js};
 const SYSTEM_PROMPT = {system_prompt_js};
 const history = [];
 
+function resizeFrame(h) {{
+    window.parent.postMessage({{ type: 'streamlit:setFrameHeight', height: h }}, '*');
+}}
+
 function openChat() {{
     document.getElementById('fab').style.display = 'none';
     document.getElementById('card').classList.add('open');
-    document.getElementById('user-input').focus();
+    resizeFrame(520);
+    setTimeout(() => document.getElementById('user-input').focus(), 100);
 }}
 
 function closeChat() {{
     document.getElementById('card').classList.remove('open');
     document.getElementById('fab').style.display = 'flex';
+    resizeFrame(70);
 }}
 
 function scrollBottom() {{
@@ -526,26 +529,7 @@ async function sendMessage() {{
 </body>
 </html>"""
 
-    # Inject CSS into the Streamlit page to fix-position the iframe and collapse its flow space
-    st.markdown("""
-    <style>
-    [data-testid="stCustomComponentV1"]:last-of-type {
-        height: 0 !important;
-        min-height: 0 !important;
-        overflow: visible !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-    [data-testid="stCustomComponentV1"]:last-of-type iframe {
-        position: fixed !important;
-        bottom: 0 !important;
-        right: 1rem !important;
-        width: 390px !important;
-        height: 560px !important;
-        border: none !important;
-        z-index: 99999 !important;
-        background: transparent !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    components.html(html, height=560)
+    # Right-align the widget: put it in the last column
+    _, right = st.columns([3, 1])
+    with right:
+        components.html(html, height=70)
