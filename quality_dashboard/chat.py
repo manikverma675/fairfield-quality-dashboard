@@ -545,7 +545,6 @@ async function sendMessage() {{
         border: none !important;
         z-index: 99999 !important;
         background: transparent !important;
-        pointer-events: none !important;
     }
     </style>
     """, unsafe_allow_html=True)
