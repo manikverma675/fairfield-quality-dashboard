@@ -75,16 +75,11 @@ if filtered.empty:
     empty_state("No customer complaints match the selected filters.")
 
 summary = ncr_summary(filtered)
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("Complaints", f"{summary['total']:,}")
 col2.metric("Open", f"{summary['open']:,}")
 col3.metric("Closed", f"{summary['closed']:,}")
 col4.metric("Median Closure Days", format_number(summary["median_closure_days"]))
-col5.metric("Complaint Rate", "N/A")
-st.caption(
-    "Complaint rate needs a shipment, order, sales, or unit denominator. "
-    "Until that source exists, this page tracks complaint count."
-)
 
 tab_trend, tab_backlog, tab_records = st.tabs(["Trend", "Backlog", "Records"])
 
