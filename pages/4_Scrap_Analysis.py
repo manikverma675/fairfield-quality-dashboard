@@ -146,8 +146,7 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 *Note: Quarantine Balance can show as negative for a period if more units were confirmed scrap than entered quarantine in that same period — this happens when older quarantine stock is cleared in bulk.*
 """)
 
-scrapped_items = set(filtered[filtered["Confirmed Scrap"] > 0]["Item"].unique())
-items_out = filtered[filtered["Item"].isin(scrapped_items)]
+items_out = filtered[filtered["Confirmed Scrap"] > 0]
 
 tab_trend, tab_items, tab_records = st.tabs(["Trend", "Items", "Records"])
 
