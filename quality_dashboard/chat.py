@@ -103,7 +103,9 @@ def _build_context() -> str:
         comp_aging = open_case_aging(complaints)
         comp_aging_str = ", ".join(f"{r['Age Bucket']}d:{r['Cases']}" for _, r in comp_aging.iterrows())
         comp_created = ncr_created_trend(complaints, "Monthly")
+        comp_closure = ncr_closure_trend(complaints, "Monthly")
         comp_str = _fmt_monthly(comp_created, "Created Cases")
+        comp_closure_str = _fmt_monthly(comp_closure, "Median Closure Days", "{:.0f}")
         sections.append(
             f"CUSTOMER COMPLAINTS: {cs['total']} total | {cs['open']} open | {cs['closed']} closed | "
             f"Median closure {cs['median_closure_days']:.1f} days "
@@ -113,7 +115,8 @@ def _build_context() -> str:
             f"Open backlog aging (days bucket:open cases): {comp_aging_str}\n"
             f"Top companies by complaint count: {comp_co_str}\n"
             f"MONTHLY TREND — open complaints created per month (YYYY-MM:count): {comp_str}\n"
-            f"MONTHLY TREND — closed complaints created per month (YYYY-MM:count): {_fmt_monthly(comp_created, 'Closed Cases')}"
+            f"MONTHLY TREND — closed complaints created per month (YYYY-MM:count): {_fmt_monthly(comp_created, 'Closed Cases')}\n"
+            f"MONTHLY TREND — median complaint closure days (YYYY-MM:days): {comp_closure_str}"
         )
     except Exception as exc:
         sections.append(f"NCR / COMPLAINTS: data unavailable ({exc})")
