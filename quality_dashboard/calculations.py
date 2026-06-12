@@ -463,26 +463,18 @@ def weight_inspector_summary(measurements: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def external_failure_summary(top_claims: pd.DataFrame, defective_damaged: pd.DataFrame) -> dict[str, float]:
+def external_failure_summary(top_claims: pd.DataFrame) -> dict[str, float]:
     if top_claims.empty:
         return {
             "total_claims": 0,
             "claim_rows": 0,
             "unique_items": 0,
-            "defect_damage_cost": 0,
-            "defect_damage_units": 0,
         }
 
     return {
         "total_claims": top_claims["Claim Amount"].sum(),
         "claim_rows": int(len(top_claims)),
         "unique_items": int(top_claims["UPC"].nunique()),
-        "defect_damage_cost": defective_damaged["Total Claim $"].sum()
-        if "Total Claim $" in defective_damaged
-        else 0,
-        "defect_damage_units": defective_damaged["Total Units"].sum()
-        if "Total Units" in defective_damaged
-        else 0,
     }
 
 
@@ -504,12 +496,4 @@ def claims_by_item(top_claims: pd.DataFrame, limit: int | None = 15) -> pd.DataF
         .agg(**{"Claims": ("UPC", "count"), "Claim Amount": ("Claim Amount", "sum")})
         .sort_values("Claim Amount", ascending=False)
     )
-    return result if limit is None else result.head(limit)
-
-
-def defective_damage_summary(defective_damaged: pd.DataFrame, limit: int | None = 15) -> pd.DataFrame:
-    if defective_damaged.empty:
-        return pd.DataFrame(columns=["Item Description", "Total Claim $", "Total Units"])
-    columns = ["Item Description", "Total Claim $", "Total Units"]
-    result = defective_damaged[columns].sort_values("Total Claim $", ascending=False)
     return result if limit is None else result.head(limit)

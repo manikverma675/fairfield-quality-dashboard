@@ -200,10 +200,10 @@ def _build_context() -> str:
 
     try:
         from quality_dashboard.data_loaders import load_external_failure_data
-        from quality_dashboard.calculations import external_failure_summary, defective_damage_summary
+        from quality_dashboard.calculations import external_failure_summary
 
         ext = load_external_failure_data(EXTERNAL_FAILURE_FILE)
-        es = external_failure_summary(ext.top_claims, ext.defective_damaged)
+        es = external_failure_summary(ext.top_claims)
         dept_total = ext.department_summary["Claim Amount"].sum()
         top_reasons = (
             ext.top_claims.groupby("Claim Reason")["Claim Amount"]
@@ -223,21 +223,15 @@ def _build_context() -> str:
         dept_str = ", ".join(
             f"{r['Department Description']} (${r['Claim Amount']:,.0f})" for _, r in dept_rows.iterrows()
         )
-        dd = defective_damage_summary(ext.defective_damaged, limit=5)
-        dd_str = ", ".join(
-            f"{r['Item Description']} (${r['Total Claim $']:,.0f}, {r['Total Units']:,.0f} units)"
-            for _, r in dd.iterrows()
-        )
         sections.append(
             f"EXTERNAL FAILURE (AMAZON CLAIMS): dept total ${dept_total:,.2f} (authoritative, full reported total) | "
             f"line-item total ${es['total_claims']:,.2f} (detail sheet only) | {es['claim_rows']:,} claim lines | "
-            f"Defect/Damage ${es['defect_damage_cost']:,.2f} ({es['defect_damage_units']:,.0f} units)\n"
+            f"{es['unique_items']:,} unique items\n"
             f"The ${dept_total - es['total_claims']:,.0f} gap between dept total and line-item total is claims "
             f"not itemized in the detail sheet.\n"
             f"Claim cost by department: {dept_str}\n"
             f"Top claim reasons: {reasons_str}\n"
-            f"Top claimed items: {items_str}\n"
-            f"Top defective/damaged items: {dd_str}"
+            f"Top claimed items: {items_str}"
         )
     except Exception as exc:
         sections.append(f"EXTERNAL FAILURE: data unavailable ({exc})")

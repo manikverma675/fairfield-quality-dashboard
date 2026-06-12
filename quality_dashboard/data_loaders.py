@@ -32,7 +32,6 @@ DATE_COLUMNS = [
 class ExternalFailureData:
     top_claims: pd.DataFrame
     department_summary: pd.DataFrame
-    defective_damaged: pd.DataFrame
 
 
 def make_unique_columns(columns: list[str]) -> list[str]:
@@ -166,27 +165,9 @@ def load_external_failure_data(
     department_summary["Allowance Amount"] = clean_currency(department_summary["Allowances"])
     department_summary["Claim Amount"] = clean_currency(department_summary["Claims"])
 
-    defective_damaged = pd.read_excel(path, sheet_name="Defective & Damaged", header=1)
-    defective_damaged = defective_damaged.dropna(axis=1, how="all").copy()
-    defective_damaged = defective_damaged.loc[:, ~defective_damaged.columns.str.startswith("Unnamed")]
-    defective_damaged = defective_damaged[defective_damaged["UPC"].notna()].copy()
-
-    numeric_columns = [
-        "Defective Merch Units",
-        "Defective Merch $",
-        "Damaged MD to 0 Units",
-        "Damaged MD to 0 $",
-        "Total Claim $",
-        "Total Units",
-    ]
-    for column in numeric_columns:
-        if column in defective_damaged:
-            defective_damaged[column] = pd.to_numeric(defective_damaged[column], errors="coerce")
-
     return ExternalFailureData(
         top_claims=top_claims,
         department_summary=department_summary,
-        defective_damaged=defective_damaged,
     )
 
 

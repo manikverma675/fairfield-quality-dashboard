@@ -4,12 +4,11 @@ import streamlit as st
 from quality_dashboard.calculations import (
     claims_by_item,
     claims_by_reason,
-    defective_damage_summary,
     external_failure_summary,
 )
 from quality_dashboard.config import EXTERNAL_FAILURE_FILE
 from quality_dashboard.data_loaders import load_external_failure_data
-from quality_dashboard.metrics import format_currency_short, format_number
+from quality_dashboard.metrics import format_currency_short
 from quality_dashboard.ui import (
     CHART_BLUE,
     CHART_ORANGE,
@@ -34,7 +33,6 @@ if not EXTERNAL_FAILURE_FILE.exists():
 external_failure = cached_external_failure()
 top_claims = external_failure.top_claims
 department_summary = external_failure.department_summary
-defective_damaged = external_failure.defective_damaged
 
 if top_claims.empty:
     empty_state("No external failure claim rows were found in the source file.")
@@ -58,33 +56,30 @@ if selected_reasons:
 if filtered_claims.empty:
     empty_state("No claim rows match the selected filters.")
 
-summary = external_failure_summary(filtered_claims, defective_damaged)
+summary = external_failure_summary(filtered_claims)
 dept_total = department_summary["Claim Amount"].sum() if not department_summary.empty else float("nan")
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("Dept Summary Total", format_currency_short(dept_total))
 col2.metric("Top Items Cost", format_currency_short(summary["total_claims"]))
 col3.metric("Claim Lines", f"{summary['claim_rows']:,}")
-col4.metric("Defect/Damage Cost †", format_currency_short(summary["defect_damage_cost"]))
-col5.metric("Defect/Damage Units †", format_number(summary["defect_damage_units"]))
+col4.metric("Unique Items", f"{summary['unique_items']:,}")
 st.caption(
     "Dept Summary Total is the full Amazon-reported total and does not change with filters. "
     "Top Items Cost is filtered by reason and covers only the line-item detail sheet — "
-    f"the {format_currency_short(dept_total - summary['total_claims'])} gap is claims not in that sheet. "
-    "† Defect/Damage figures are not filterable by claim reason."
+    f"the {format_currency_short(dept_total - summary['total_claims'])} gap is claims not in that sheet."
 )
 
 with st.expander("Formulas & Methodology"):
     st.markdown("""
 **Where the numbers come from**
 
-This page pulls from three separate tabs inside the source Excel file. They are independent Amazon reports and their totals will not exactly match each other — this is expected.
+This page pulls from two separate tabs inside the source Excel file. They are independent Amazon reports and their totals will not exactly match each other — this is expected.
 
 | Tab | What it contains | Affected by claim reason filter? |
 |---|---|---|
 | Department Summary | Amazon's rolled-up claim totals by department. One row per department. | No — always shows the full period total. |
 | Line-Item Detail (Top Claimed Items) | Individual claim lines with one row per item per claim reason. This is the detail behind the department totals. | Yes — filtering by reason removes rows from this sheet only. |
-| Defective & Damaged | A separate product-level breakdown of defective merchandise and damaged-in-transit claims. | No — not linked to the claim reason filter. |
 
 ---
 
@@ -95,10 +90,7 @@ This page pulls from three separate tabs inside the source Excel file. They are 
 | Dept Summary Total | Sum of the *Claim Amount* column across every row in the Department Summary tab. This is Amazon's stated grand total for the period and **does not change** when you filter by claim reason. |
 | Top Items Cost | Sum of *Claim Amount* from the Line-Item Detail tab, after applying the selected claim reason filter. This will always be less than or equal to the Dept Summary Total because not every claim type has individual item lines in the detail sheet. |
 | Claim Lines | Count of rows in the Line-Item Detail tab after filtering. One row = one item charged under one claim reason. |
-| Defect/Damage Cost † | Sum of the *Total Claim $* column in the Defective & Damaged tab across all rows. |
-| Defect/Damage Units † | Sum of the *Total Units* column in the Defective & Damaged tab across all rows. |
-
-† The Defect/Damage figures come from a completely separate tab and are **not affected by the claim reason filter**.
+| Unique Items | Count of distinct UPCs in the Line-Item Detail tab after filtering. |
 
 The dollar gap between *Dept Summary Total* and *Top Items Cost* is money that Amazon charged at the department level but did not break down to individual items in the detail sheet — for example, freight allowances or category-level deductions.
 
@@ -167,7 +159,6 @@ with tab_cost:
 
 with tab_items:
     item_summary = claims_by_item(filtered_claims, limit=top_n)
-    damage_summary = defective_damage_summary(defective_damaged, limit=top_n)
 
     item_event = st.altair_chart(
         bar_chart(
@@ -183,13 +174,8 @@ with tab_items:
         key="ef_item_chart",
     )
 
-    left, right = st.columns(2)
-    with left:
-        st.subheader("Top Claimed Items")
-        st.dataframe(item_summary, width="stretch", hide_index=True)
-    with right:
-        st.subheader("Defective and Damaged Items")
-        st.dataframe(damage_summary, width="stretch", hide_index=True)
+    st.subheader("Top Claimed Items")
+    st.dataframe(item_summary, width="stretch", hide_index=True)
 
     selected_item = selected_value(item_event, "Item Description")
     if selected_item:
