@@ -161,20 +161,60 @@ with tab_trend:
     m2.metric("Peak Period", format_number(peak[measure_col]), peak["Period"].strftime("%Y-%m-%d"))
     m3.metric("Average per Period", format_number(trend[measure_col].mean()))
 
-    st.altair_chart(
+    trend_event = st.altair_chart(
         period_line_chart(
             trend,
             measure_col,
-            f"{measure_col} by {grain.lower()} period",
+            f"{measure_col} by {grain.lower()} period — click a dot to drill down",
             color=CHART_BLUE,
             height=620,
+            selectable=True,
             extra_tooltips=[
                 alt.Tooltip("Transactions:Q", format=","),
                 alt.Tooltip("Items:Q", format=","),
             ],
         ),
         width="stretch",
+        on_select="rerun",
+        key="scrap_trend_chart",
     )
+
+    _GRAIN_DELTA = {
+        "Daily": pd.Timedelta(days=1),
+        "Weekly": pd.Timedelta(weeks=1),
+        "Monthly": pd.DateOffset(months=1),
+        "Quarterly": pd.DateOffset(months=3),
+        "Yearly": pd.DateOffset(years=1),
+    }
+
+    selected_period_raw = selected_value(trend_event, "Period")
+    if selected_period_raw is not None:
+        # Altair returns temporal fields as UTC milliseconds (int) or ISO strings
+        if isinstance(selected_period_raw, (int, float)):
+            selected_ts = pd.Timestamp(int(selected_period_raw), unit="ms")
+        else:
+            selected_ts = pd.Timestamp(selected_period_raw)
+        selected_ts = selected_ts.tz_localize(None) if selected_ts.tzinfo else selected_ts
+
+        # Use date-range filter to avoid exact Timestamp equality issues
+        delta = _GRAIN_DELTA.get(grain, pd.Timedelta(weeks=1))
+        period_end = selected_ts + delta
+        period_rows = filtered[
+            (filtered["Date"] >= selected_ts) & (filtered["Date"] < period_end)
+        ]
+        drill_cols = ["Date", "Document Number", "Type", "Item", "Quantity",
+                      "Into Quarantine", "Confirmed Scrap", "Location", "Bin Number", "User", "Employee"]
+        st.subheader(f"Transactions — {selected_ts.strftime('%Y-%m-%d')} ({len(period_rows):,} rows)")
+        st.caption("Click the same dot again to clear.")
+        st.dataframe(
+            period_rows.sort_values("Date", ascending=False)[
+                [c for c in drill_cols if c in period_rows.columns]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+    else:
+        st.caption("Click a dot on the chart to see that period's raw transactions.")
 
 
 with tab_items:

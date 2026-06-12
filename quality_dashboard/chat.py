@@ -226,7 +226,8 @@ def _build_context() -> str:
         sections.append(
             f"EXTERNAL FAILURE (AMAZON CLAIMS): dept total ${dept_total:,.2f} (authoritative, full reported total) | "
             f"line-item total ${es['total_claims']:,.2f} (detail sheet only) | {es['claim_rows']:,} claim lines | "
-            f"{es['unique_items']:,} unique items\n"
+            f"{es['unique_items']:,} unique items | "
+            f"defect/damage cost ${es['defect_damage_cost']:,.2f} | defect/damage lines {es['defect_damage_units']:,}\n"
             f"The ${dept_total - es['total_claims']:,.0f} gap between dept total and line-item total is claims "
             f"not itemized in the detail sheet.\n"
             f"Claim cost by department: {dept_str}\n"

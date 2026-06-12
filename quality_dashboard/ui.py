@@ -108,6 +108,7 @@ def period_line_chart(
     y_format: str | None = None,
     extra_tooltips: list[alt.Tooltip] | None = None,
     height: int = 340,
+    selectable: bool = False,
 ) -> alt.Chart:
     y_axis = alt.Axis(format=y_format) if y_format else alt.Axis()
     tooltips = [
@@ -117,16 +118,38 @@ def period_line_chart(
     if extra_tooltips:
         tooltips.extend(extra_tooltips)
 
-    return (
+    x_enc = alt.X("Period:T", title=None)
+    y_enc = alt.Y(f"{y_col}:Q", title=y_col, axis=y_axis)
+
+    if not selectable:
+        return (
+            alt.Chart(data)
+            .mark_line(point=True, color=color, strokeWidth=3)
+            .encode(x=x_enc, y=y_enc, tooltip=tooltips)
+            .properties(title=title, height=height)
+        )
+
+    sel = alt.selection_point(name="sel", on="click", nearest=True, fields=["Period"])
+
+    line = (
         alt.Chart(data)
-        .mark_line(point=True, color=color, strokeWidth=3)
+        .mark_line(color=color, strokeWidth=3)
+        .encode(x=x_enc, y=y_enc)
+    )
+
+    points = (
+        alt.Chart(data)
+        .mark_point(filled=True, size=180, color=color)
         .encode(
-            x=alt.X("Period:T", title=None),
-            y=alt.Y(f"{y_col}:Q", title=y_col, axis=y_axis),
+            x=x_enc,
+            y=y_enc,
+            opacity=alt.condition(sel, alt.value(1.0), alt.value(0.5)),
             tooltip=tooltips,
         )
-        .properties(title=title, height=height)
+        .add_params(sel)
     )
+
+    return (line + points).properties(title=title, height=height)
 
 
 def dual_line_chart(

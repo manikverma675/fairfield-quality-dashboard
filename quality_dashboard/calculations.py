@@ -463,18 +463,26 @@ def weight_inspector_summary(measurements: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+_DEFECT_DAMAGE_REASONS = {"Defective Merchandise", "Damaged MD to 0"}
+
+
 def external_failure_summary(top_claims: pd.DataFrame) -> dict[str, float]:
     if top_claims.empty:
         return {
             "total_claims": 0,
             "claim_rows": 0,
             "unique_items": 0,
+            "defect_damage_cost": 0,
+            "defect_damage_units": 0,
         }
 
+    dd = top_claims[top_claims["Claim Reason"].isin(_DEFECT_DAMAGE_REASONS)]
     return {
         "total_claims": top_claims["Claim Amount"].sum(),
         "claim_rows": int(len(top_claims)),
         "unique_items": int(top_claims["UPC"].nunique()),
+        "defect_damage_cost": dd["Claim Amount"].sum(),
+        "defect_damage_units": int(len(dd)),
     }
 
 

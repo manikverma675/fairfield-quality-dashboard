@@ -59,15 +59,17 @@ if filtered_claims.empty:
 summary = external_failure_summary(filtered_claims)
 dept_total = department_summary["Claim Amount"].sum() if not department_summary.empty else float("nan")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Dept Summary Total", format_currency_short(dept_total))
 col2.metric("Top Items Cost", format_currency_short(summary["total_claims"]))
 col3.metric("Claim Lines", f"{summary['claim_rows']:,}")
-col4.metric("Unique Items", f"{summary['unique_items']:,}")
+col4.metric("Defect/Damage Cost", format_currency_short(summary["defect_damage_cost"]))
+col5.metric("Defect/Damage Units", f"{summary['defect_damage_units']:,}")
 st.caption(
-    "Dept Summary Total is the full Amazon-reported total and does not change with filters. "
+    "Dept Summary Total is the full retailer-reported total and does not change with filters. "
     "Top Items Cost is filtered by reason and covers only the line-item detail sheet — "
-    f"the {format_currency_short(dept_total - summary['total_claims'])} gap is claims not in that sheet."
+    f"the {format_currency_short(dept_total - summary['total_claims'])} gap is claims not in that sheet. "
+    "Defect/Damage Cost and Units count only *Defective Merchandise* and *Damaged MD to 0* claim lines."
 )
 
 with st.expander("Formulas & Methodology"):
@@ -87,10 +89,11 @@ This page pulls from two separate tabs inside the source Excel file. They are in
 
 | Metric | How it is calculated |
 |---|---|
-| Dept Summary Total | Sum of the *Claim Amount* column across every row in the Department Summary tab. This is Amazon's stated grand total for the period and **does not change** when you filter by claim reason. |
+| Dept Summary Total | Sum of the *Claim Amount* column across every row in the Department Summary tab. This is the retailer's stated grand total for the period and **does not change** when you filter by claim reason. |
 | Top Items Cost | Sum of *Claim Amount* from the Line-Item Detail tab, after applying the selected claim reason filter. This will always be less than or equal to the Dept Summary Total because not every claim type has individual item lines in the detail sheet. |
 | Claim Lines | Count of rows in the Line-Item Detail tab after filtering. One row = one item charged under one claim reason. |
-| Unique Items | Count of distinct UPCs in the Line-Item Detail tab after filtering. |
+| Defect/Damage Cost | Sum of *Claim Amount* for rows where Claim Reason is **Defective Merchandise** or **Damaged MD to 0**, after filtering. Shows how much of the total cost is driven by product quality and damage issues specifically. |
+| Defect/Damage Units | Count of claim lines where Claim Reason is **Defective Merchandise** or **Damaged MD to 0**, after filtering. |
 
 The dollar gap between *Dept Summary Total* and *Top Items Cost* is money that Amazon charged at the department level but did not break down to individual items in the detail sheet — for example, freight allowances or category-level deductions.
 
