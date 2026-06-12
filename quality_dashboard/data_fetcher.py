@@ -10,7 +10,7 @@ from quality_dashboard.config import DATA_DIR, DEFECT_FILE, EXTERNAL_FAILURE_FIL
 _FILES = {
     "NCR Cases.xls": NCR_CASES_FILE,
     "Defect Rate.xlsx": DEFECT_FILE,
-    "Scrape Rate.csv": SCRAP_FILE,
+    "transaction-history (2).csv": SCRAP_FILE,
     "External Failure cost Amazon.xlsx": EXTERNAL_FAILURE_FILE,
 }
 
