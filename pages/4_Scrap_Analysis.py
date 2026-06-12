@@ -146,6 +146,10 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 *Note: Quarantine Balance can show as negative for a period if more units were confirmed scrap than entered quarantine in that same period — this happens when older quarantine stock is cleared in bulk.*
 """)
 
+item_balance = filtered.groupby("Item")["Quarantine Balance"].sum()
+negative_balance_items = set(item_balance[item_balance < 0].index)
+items_out = filtered[filtered["Item"].isin(negative_balance_items)]
+
 tab_trend, tab_items, tab_records = st.tabs(["Trend", "Items", "Records"])
 
 with tab_trend:
@@ -174,10 +178,6 @@ with tab_trend:
 
 
 with tab_items:
-    item_balance = filtered.groupby("Item")["Quarantine Balance"].sum()
-    negative_balance_items = set(item_balance[item_balance < 0].index)
-    items_out = filtered[filtered["Item"].isin(negative_balance_items)]
-
     item_summary = scrap_item_summary(items_out, measure_col, limit=top_n)
     trend_items = selected_items if selected_items else item_summary["Item"].tolist()
     item_trend = scrap_item_trend(items_out, grain, measure_col, trend_items)
@@ -230,9 +230,9 @@ with tab_records:
         "Employee",
         "Inventory Number",
     ]
-    visible_columns = [column for column in visible_columns if column in filtered.columns]
+    visible_columns = [column for column in visible_columns if column in items_out.columns]
     st.dataframe(
-        filtered.sort_values("Date", ascending=False)[visible_columns],
+        items_out.sort_values("Date", ascending=False)[visible_columns],
         width="stretch",
         hide_index=True,
     )
