@@ -107,6 +107,7 @@ def period_line_chart(
     color: str = CHART_BLUE,
     y_format: str | None = None,
     extra_tooltips: list[alt.Tooltip] | None = None,
+    height: int = 340,
 ) -> alt.Chart:
     y_axis = alt.Axis(format=y_format) if y_format else alt.Axis()
     tooltips = [
@@ -124,7 +125,7 @@ def period_line_chart(
             y=alt.Y(f"{y_col}:Q", title=y_col, axis=y_axis),
             tooltip=tooltips,
         )
-        .properties(title=title, height=340)
+        .properties(title=title, height=height)
     )
 
 

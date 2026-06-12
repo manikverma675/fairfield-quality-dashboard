@@ -154,7 +154,7 @@ tab_trend, tab_items, tab_records = st.tabs(["Trend", "Items", "Records"])
 
 with tab_trend:
     trend = scrap_trend(filtered, grain, measure_col)
-    left, right = st.columns([2, 1])
+    left, right = st.columns([4, 1])
     with left:
         st.altair_chart(
             period_line_chart(
@@ -162,6 +162,7 @@ with tab_trend:
                 measure_col,
                 f"{measure_col} by {grain.lower()} period",
                 color=CHART_BLUE,
+                height=560,
                 extra_tooltips=[
                     alt.Tooltip("Transactions:Q", format=","),
                     alt.Tooltip("Items:Q", format=","),
