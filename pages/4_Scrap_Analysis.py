@@ -15,7 +15,6 @@ from quality_dashboard.data_loaders import load_scrap_data
 from quality_dashboard.metrics import PERIOD_OPTIONS, date_bounds, format_number, format_percent
 from quality_dashboard.ui import (
     CHART_BLUE,
-    CHART_GREEN,
     CHART_ORANGE,
     bar_chart,
     empty_state,
@@ -134,9 +133,7 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 | Chart | How it is calculated |
 |---|---|
 | Selected Measure by Period | For each period (week/month/etc.), sums whichever measure you selected in the sidebar radio button. Shows how that measure changes over time. |
-| Rolling Average | For each period, takes the average of that period's value plus the three periods immediately before it (a 4-period rolling window). This smooths out short-term noise and makes the underlying trend easier to see. The first period uses whatever data is available rather than leaving it blank. |
-| Confirmed Scrap vs Into Quarantine | Both series summed per period on the same chart. When Confirmed Scrap is higher than Into Quarantine in a given period, it means units quarantined in **earlier** periods are being written off now in a batch — the two flows don't have to balance within any single period. |
-| Cumulative Confirmed Scrap vs Into Quarantine | The same two series shown as running totals from the start of the selected date range. When the orange (Confirmed Scrap) line rises above blue (Into Quarantine), it means those units were quarantined before the current date window — their quarantine entry is not in the visible range but the scrap write-off is. Where blue sits above orange, the gap is units still in quarantine waiting for a final decision. |
+| Cumulative Confirmed Scrap vs Into Quarantine | Running totals of both flows from the start of the selected date range. The gap where blue (Into Quarantine) sits above orange (Confirmed Scrap) is the outstanding quarantine balance — units flagged but not yet written off. Data goes back to September 2022 so the full quarantine history is captured. |
 
 ---
 
@@ -176,59 +173,7 @@ with tab_trend:
         st.metric("Peak Period", format_number(peak[measure_col]), peak["Period"].strftime("%Y-%m-%d"))
         st.metric("Average per Period", format_number(trend[measure_col].mean()))
 
-    rolling = (
-        alt.Chart(trend)
-        .mark_line(color=CHART_GREEN, strokeDash=[6, 4], strokeWidth=3)
-        .encode(
-            x=alt.X("Period:T", title=None),
-            y=alt.Y("Rolling Average:Q", title="4-period rolling average"),
-            tooltip=[
-                alt.Tooltip("Period:T", title="Period"),
-                alt.Tooltip("Rolling Average:Q", format=",.2f"),
-            ],
-        )
-        .properties(title="Rolling Average", height=260)
-    )
-    st.altair_chart(rolling, width="stretch")
-
     if not rate_trend.empty:
-        flow_data = rate_trend.melt(
-            id_vars=["Period"],
-            value_vars=["Confirmed Scrap", "Into Quarantine"],
-            var_name="Flow",
-            value_name="Units",
-        )
-        flow_chart = (
-            alt.Chart(flow_data)
-            .mark_line(point=True, strokeWidth=2)
-            .encode(
-                x=alt.X("Period:T", title=None),
-                y=alt.Y("Units:Q", title="Units"),
-                color=alt.Color(
-                    "Flow:N",
-                    scale=alt.Scale(
-                        domain=["Confirmed Scrap", "Into Quarantine"],
-                        range=[CHART_ORANGE, CHART_BLUE],
-                    ),
-                ),
-                tooltip=[
-                    alt.Tooltip("Period:T", title="Period"),
-                    alt.Tooltip("Flow:N"),
-                    alt.Tooltip("Units:Q", format=",.0f"),
-                ],
-            )
-            .properties(
-                title=f"Confirmed Scrap vs Into Quarantine by {grain.lower()} period",
-                height=300,
-            )
-        )
-        st.altair_chart(flow_chart, width="stretch")
-        st.caption(
-            "Confirmed Scrap can exceed Into Quarantine in a given period because items "
-            "quarantined in earlier periods are often confirmed/disposed later. "
-            "The overall rate in the headline card is the meaningful figure."
-        )
-
         cumulative = rate_trend[["Period", "Confirmed Scrap", "Into Quarantine"]].copy()
         cumulative["Confirmed Scrap"] = cumulative["Confirmed Scrap"].cumsum()
         cumulative["Into Quarantine"] = cumulative["Into Quarantine"].cumsum()
