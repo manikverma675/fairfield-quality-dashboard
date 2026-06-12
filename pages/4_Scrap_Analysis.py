@@ -133,7 +133,6 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 | Chart | How it is calculated |
 |---|---|
 | Selected Measure by Period | For each period (week/month/etc.), sums whichever measure you selected in the sidebar radio button. Shows how that measure changes over time. |
-| Cumulative Confirmed Scrap vs Into Quarantine | Running totals of both flows from the start of the selected date range. The gap where blue (Into Quarantine) sits above orange (Confirmed Scrap) is the outstanding quarantine balance — units flagged but not yet written off. Data goes back to September 2022 so the full quarantine history is captured. |
 
 ---
 
@@ -173,48 +172,6 @@ with tab_trend:
         st.metric("Peak Period", format_number(peak[measure_col]), peak["Period"].strftime("%Y-%m-%d"))
         st.metric("Average per Period", format_number(trend[measure_col].mean()))
 
-    if not rate_trend.empty:
-        cumulative = rate_trend[["Period", "Confirmed Scrap", "Into Quarantine"]].copy()
-        cumulative["Confirmed Scrap"] = cumulative["Confirmed Scrap"].cumsum()
-        cumulative["Into Quarantine"] = cumulative["Into Quarantine"].cumsum()
-        cumulative_data = cumulative.melt(
-            id_vars=["Period"],
-            value_vars=["Confirmed Scrap", "Into Quarantine"],
-            var_name="Flow",
-            value_name="Units",
-        )
-        cumulative_chart = (
-            alt.Chart(cumulative_data)
-            .mark_line(point=True, strokeWidth=2)
-            .encode(
-                x=alt.X("Period:T", title=None),
-                y=alt.Y("Units:Q", title="Cumulative Units"),
-                color=alt.Color(
-                    "Flow:N",
-                    scale=alt.Scale(
-                        domain=["Confirmed Scrap", "Into Quarantine"],
-                        range=[CHART_ORANGE, CHART_BLUE],
-                    ),
-                ),
-                tooltip=[
-                    alt.Tooltip("Period:T", title="Period"),
-                    alt.Tooltip("Flow:N"),
-                    alt.Tooltip("Units:Q", format=",.0f", title="Cumulative Units"),
-                ],
-            )
-            .properties(
-                title=f"Cumulative Confirmed Scrap vs Into Quarantine",
-                height=300,
-            )
-        )
-        st.altair_chart(cumulative_chart, width="stretch")
-        st.caption(
-            "Cumulative totals running from the start of the selected date range. "
-            "When the orange (Confirmed Scrap) line rises above blue (Into Quarantine), "
-            "it means those units were quarantined before the selected date range begins — "
-            "their quarantine entry is not visible in this window but the scrap write-off is. "
-            "The vertical gap where blue is above orange represents units still sitting in quarantine."
-        )
 
 with tab_items:
     item_balance = filtered.groupby("Item")["Quarantine Balance"].sum()
