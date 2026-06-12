@@ -21,6 +21,7 @@ from quality_dashboard.ui import (
     file_missing,
     period_line_chart,
     render_header,
+    selected_value,
 )
 
 
@@ -123,7 +124,7 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 | Confirmed Scrap | Sum of all confirmed-scrap units across every transaction in the filtered date and item range. |
 | Into Quarantine | Sum of all units moved into quarantine in the filtered range. |
 | Quarantine Balance | Sum of (Into Quarantine − Confirmed Scrap) across the filtered transactions. This number includes both true pending-discard units **and** non-waste items that permanently reside in the quarantine location (e.g. RFID tags). Interpret it alongside Confirmed Scrap rather than in isolation. |
-| Confirmation Rate | *Confirmed Scrap ÷ Into Quarantine*, calculated using only the numbers from the **most recent period** on the chart. Tells you what fraction of quarantined units are actually being written off as scrap right now. A rate below 1.0 means more units are going in than are being resolved. |
+| Confirmation Rate | *Confirmed Scrap ÷ Into Quarantine*, calculated using only the numbers from the **most recent period** on the chart. *Example: 80 units written off ÷ 100 units quarantined = 0.80 (80%).* Tells you what fraction of quarantined units are actually being written off as scrap right now. A rate below 1.0 means more units are going in than are being resolved. |
 | Items | Count of distinct item codes that appear in at least one transaction in the filtered set. |
 | Transactions | Total number of individual transaction rows after filtering. |
 
@@ -139,12 +140,12 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 
 **Items Tab**
 
+*This whole tab uses only the **confirmed-scrap (negative-quantity) transactions** and always measures **Confirmed Scrap**, regardless of the sidebar measure. The sidebar measure applies to the Trend tab.*
+
 | Chart | How it is calculated |
 |---|---|
-| Item Trend | Shows only items that have been **confirmed as scrap at least once** — i.e., items with at least one negative-quantity write-off transaction. Items that only ever moved into quarantine and were never written off (e.g. RFID tags) are excluded. For each qualifying item, the chosen measure is summed per period and drawn as a separate line. |
-| Top Items | Same filter as Item Trend — only items with at least one confirmed scrap write-off. Ranked from highest to lowest by the chosen measure. The dropdown controls how many appear — select **All** to show every item. |
-
-*Note: Quarantine Balance can show as negative for a period if more units were confirmed scrap than entered quarantine in that same period — this happens when older quarantine stock is cleared in bulk.*
+| Item Trend | For each item that has been written off as scrap at least once, sums its confirmed-scrap units per period and draws a separate line. |
+| Top Items | Sums confirmed-scrap units per item across the filtered range and ranks highest to lowest. The dropdown controls how many appear — select **All** to show every item. **Click a bar to list that item's individual write-off transactions in a table below.** |
 """)
 
 items_out = filtered[filtered["Confirmed Scrap"] > 0]
@@ -177,9 +178,16 @@ with tab_trend:
 
 
 with tab_items:
-    item_summary = scrap_item_summary(items_out, measure_col, limit=top_n)
+    # The Items tab only contains confirmed-scrap (negative-quantity) rows, so the only
+    # measure that is meaningful here is Confirmed Scrap. Into Quarantine would be all zero
+    # and Quarantine Balance all negative. The sidebar measure still drives the Trend tab.
+    items_measure = "Confirmed Scrap"
+    if measure_col != items_measure:
+        st.caption(f"This tab always uses **Confirmed Scrap** (the sidebar's *{measure_col}* applies to the Trend tab).")
+
+    item_summary = scrap_item_summary(items_out, items_measure, limit=top_n)
     trend_items = selected_items if selected_items else item_summary["Item"].tolist()
-    item_trend = scrap_item_trend(items_out, grain, measure_col, trend_items)
+    item_trend = scrap_item_trend(items_out, grain, items_measure, trend_items)
 
     if not item_trend.empty:
         item_chart = (
@@ -187,12 +195,12 @@ with tab_items:
             .mark_line(point=True, strokeWidth=2)
             .encode(
                 x=alt.X("Period:T", title=None),
-                y=alt.Y(f"{measure_col}:Q", title=measure_col),
+                y=alt.Y(f"{items_measure}:Q", title=items_measure),
                 color=alt.Color("Item:N", title="Item"),
                 tooltip=[
                     alt.Tooltip("Period:T", title="Period"),
                     alt.Tooltip("Item:N"),
-                    alt.Tooltip(f"{measure_col}:Q", format=",.2f"),
+                    alt.Tooltip(f"{items_measure}:Q", format=",.2f"),
                     alt.Tooltip("Transactions:Q", format=","),
                 ],
             )
@@ -200,18 +208,48 @@ with tab_items:
         )
         st.altair_chart(item_chart, width="stretch")
 
-    st.altair_chart(
+    item_event = st.altair_chart(
         bar_chart(
             item_summary,
-            measure_col,
+            items_measure,
             "Item",
-            f"Top {len(item_summary)} Items by {measure_col}",
+            f"Top {len(item_summary)} Items by {items_measure} — click a bar to filter",
             color=CHART_ORANGE,
+            selectable=True,
         ),
         width="stretch",
+        on_select="rerun",
+        key="scrap_item_chart",
     )
     st.subheader("Item Summary")
     st.dataframe(item_summary, width="stretch", hide_index=True)
+
+    selected_item = selected_value(item_event, "Item")
+    raw_columns = [
+        "Date",
+        "Document Number",
+        "Type",
+        "Item",
+        "Quantity",
+        "Confirmed Scrap",
+        "Location",
+        "Bin Number",
+        "User",
+        "Employee",
+    ]
+    if selected_item:
+        item_rows = items_out[items_out["Item"] == selected_item]
+        st.subheader(f"Confirmed Scrap transactions — {selected_item} ({len(item_rows)} rows)")
+        st.caption("Click the same bar again to clear.")
+        st.dataframe(
+            item_rows.sort_values("Date", ascending=False)[
+                [c for c in raw_columns if c in item_rows.columns]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+    else:
+        st.caption("Click a bar above to list that item's confirmed-scrap transactions here.")
 
 with tab_records:
     visible_columns = [

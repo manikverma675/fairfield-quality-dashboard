@@ -158,3 +158,18 @@ def dual_line_chart(
 def empty_state(message: str) -> None:
     st.warning(message)
     st.stop()
+
+
+def selected_value(event, field: str):
+    """Return the value of `field` for the bar a user clicked, or None if nothing is selected.
+
+    Works with the event object returned by st.altair_chart(..., on_select="rerun")
+    when the chart was built with bar_chart(selectable=True).
+    """
+    try:
+        points = event.selection.get("sel", [])
+        if points:
+            return points[0].get(field)
+    except (AttributeError, KeyError, TypeError, IndexError):
+        return None
+    return None

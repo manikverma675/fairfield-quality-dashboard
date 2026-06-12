@@ -17,6 +17,7 @@ from quality_dashboard.ui import (
     empty_state,
     file_missing,
     render_header,
+    selected_value,
 )
 
 
@@ -107,9 +108,9 @@ The dollar gap between *Dept Summary Total* and *Top Items Cost* is money that A
 
 | Chart | How it is calculated |
 |---|---|
-| Claim Cost by Reason | Groups every row in the Line-Item Detail tab by *Claim Reason* and sums their *Claim Amount*. Shows which type of claim (e.g. damaged, defective, shortage) is costing the most money. |
-| Claim Cost by Department | Groups the Department Summary tab by *Department Description* and sums *Claim Amount* per department. Shows which product departments are generating the most claim dollars according to Amazon's own rolled-up report. |
-| Top Items by Claim Cost | Groups the Line-Item Detail tab by *Item Description*, sums *Claim Amount* per item, and ranks from highest to lowest. Shows which specific products are responsible for the most claim dollars in the detail sheet. The dropdown controls how many items appear — select **All** to show every item. |
+| Claim Cost by Reason | Groups every row in the Line-Item Detail tab by *Claim Reason* and sums their *Claim Amount*. Shows which type of claim (e.g. damaged, defective, shortage) is costing the most money. Click a bar to list that reason's individual claim lines below. |
+| Claim Cost by Department | Groups the Department Summary tab by *Department Description* and sums *Claim Amount* per department. Shows which product departments are generating the most claim dollars according to Amazon's own rolled-up report. *(Not clickable — the detail sheet has no department column to drill into.)* |
+| Top Items by Claim Cost | Groups the Line-Item Detail tab by *Item Description*, sums *Claim Amount* per item, and ranks from highest to lowest. Shows which specific products are responsible for the most claim dollars in the detail sheet. The dropdown controls how many items appear — select **All** to show every item. Click a bar to list that item's individual claim lines below. |
 """)
 
 tab_cost, tab_items, tab_records = st.tabs(["Cost", "Items", "Records"])
@@ -118,16 +119,19 @@ with tab_cost:
     reason_summary = claims_by_reason(filtered_claims)
     left, right = st.columns(2)
     with left:
-        st.altair_chart(
+        reason_event = st.altair_chart(
             bar_chart(
                 reason_summary,
                 "Claim Amount",
                 "Claim Reason",
-                "Claim Cost by Reason",
+                "Claim Cost by Reason — click a bar to filter",
                 color=CHART_BLUE,
                 x_format="$,.0f",
+                selectable=True,
             ),
             width="stretch",
+            on_select="rerun",
+            key="ef_reason_chart",
         )
     with right:
         dept_chart_data = department_summary.sort_values("Claim Amount", ascending=False)
@@ -146,19 +150,37 @@ with tab_cost:
     st.subheader("Reason Summary")
     st.dataframe(reason_summary, width="stretch", hide_index=True)
 
+    selected_reason = selected_value(reason_event, "Claim Reason")
+    if selected_reason:
+        reason_rows = filtered_claims[filtered_claims["Claim Reason"] == selected_reason]
+        st.subheader(f"Claim lines — {selected_reason} ({len(reason_rows)} rows)")
+        st.caption("Click the same bar again to clear.")
+        st.dataframe(
+            reason_rows.sort_values("Claim Amount", ascending=False)[
+                [c for c in ["UPC", "Item Description", "Item Number", "Claim Amount", "Claim Reason"] if c in reason_rows.columns]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+    else:
+        st.caption("Click a bar in *Claim Cost by Reason* to list its individual claim lines here. (The Department chart isn't clickable — the source detail sheet has no department column to drill into.)")
+
 with tab_items:
     item_summary = claims_by_item(filtered_claims, limit=top_n)
     damage_summary = defective_damage_summary(defective_damaged, limit=top_n)
 
-    st.altair_chart(
+    item_event = st.altair_chart(
         bar_chart(
             item_summary,
             "Claim Amount",
             "Item Description",
-            f"Top {len(item_summary)} Items by Claim Cost",
+            f"Top {len(item_summary)} Items by Claim Cost — click a bar to filter",
             x_format="$,.0f",
+            selectable=True,
         ),
         width="stretch",
+        on_select="rerun",
+        key="ef_item_chart",
     )
 
     left, right = st.columns(2)
@@ -168,6 +190,21 @@ with tab_items:
     with right:
         st.subheader("Defective and Damaged Items")
         st.dataframe(damage_summary, width="stretch", hide_index=True)
+
+    selected_item = selected_value(item_event, "Item Description")
+    if selected_item:
+        item_rows = filtered_claims[filtered_claims["Item Description"] == selected_item]
+        st.subheader(f"Claim lines — {selected_item} ({len(item_rows)} rows)")
+        st.caption("Click the same bar again to clear.")
+        st.dataframe(
+            item_rows.sort_values("Claim Amount", ascending=False)[
+                [c for c in ["UPC", "Item Description", "Item Number", "Claim Amount", "Claim Reason"] if c in item_rows.columns]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+    else:
+        st.caption("Click a bar above to list that item's individual claim lines here.")
 
 with tab_records:
     visible_claims = [

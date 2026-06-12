@@ -327,7 +327,7 @@ def weight_trend(measurements: pd.DataFrame, grain: str) -> pd.DataFrame:
     )
 
 
-def weight_item_summary(measurements: pd.DataFrame, limit: int = 15) -> pd.DataFrame:
+def weight_item_summary(measurements: pd.DataFrame, limit: int | None = 15) -> pd.DataFrame:
     if measurements.empty:
         return pd.DataFrame(
             columns=[
@@ -368,14 +368,15 @@ def weight_item_summary(measurements: pd.DataFrame, limit: int = 15) -> pd.DataF
             }
         )
     )
-    return summary.sort_values(
+    summary = summary.sort_values(
         ["Average Absolute Variance", "Comparable Measurements"],
         ascending=[False, False],
         na_position="last",
-    ).head(limit)
+    )
+    return summary if limit is None else summary.head(limit)
 
 
-def weight_work_order_summary(measurements: pd.DataFrame, limit: int = 50) -> pd.DataFrame:
+def weight_work_order_summary(measurements: pd.DataFrame, limit: int | None = 50) -> pd.DataFrame:
     if measurements.empty:
         return pd.DataFrame(
             columns=[
@@ -427,7 +428,7 @@ def weight_work_order_summary(measurements: pd.DataFrame, limit: int = 50) -> pd
             na_position="last",
         )
     )
-    return grouped.head(limit)
+    return grouped if limit is None else grouped.head(limit)
 
 
 def weight_inspector_summary(measurements: pd.DataFrame) -> pd.DataFrame:

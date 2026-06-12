@@ -21,6 +21,7 @@ from quality_dashboard.ui import (
     file_missing,
     period_line_chart,
     render_header,
+    selected_value,
 )
 
 
@@ -103,7 +104,8 @@ with st.sidebar:
     selected_inspectors = st.multiselect("Inspector", inspectors, default=[])
     selected_items = st.multiselect("Assembly item", items, default=[])
     selected_work_orders = st.multiselect("Work order", work_orders, default=[])
-    top_n = st.slider("Top rows shown", 5, 50, 15)
+    _top_n_label = st.selectbox("Top rows shown", [10, 15, 20, 25, 30, 50, 75, 100, "All"], index=1)
+    top_n = None if _top_n_label == "All" else _top_n_label
 
 if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
     start_date, end_date = selected_dates
@@ -168,8 +170,8 @@ A measurement is **comparable** only when the expected weight could be read from
 |---|---|
 | Measured vs Expected (scatter) | Each dot is one measurement. X-axis = the expected target weight; Y-axis = the actual weight recorded by the inspector. The dashed diagonal line represents perfect accuracy — a dot exactly on the line means Actual = Expected (zero error). Dots above the line are heavier than expected; dots below are lighter. Clusters far from the diagonal reveal a consistent bias. Color shows the Weight Status of each measurement. |
 | Avg Absolute Variance by Period | For each period (day/week/month), takes all comparable measurements that fall in that period and calculates the average \|Actual − Expected\|. A rising trend means inspections are becoming less consistent over time. |
-| Work Orders by Avg Abs Variance | For each work order, calculates the average \|Actual − Expected\| across all its measurements and ranks from highest to lowest. Work orders at the top of the list are the most inconsistent production runs. |
-| Assembly Items by Avg Abs Variance | Same calculation as Work Orders above, but grouped by Assembly Item instead. Shows which products are most consistently missing their weight targets. |
+| Work Orders by Avg Abs Variance | For each work order, calculates the average \|Actual − Expected\| across all its measurements and ranks from highest to lowest. Work orders at the top of the list are the most inconsistent production runs. Click a bar to list that work order's individual measurements below the chart. |
+| Assembly Items by Avg Abs Variance | Same calculation as Work Orders above, but grouped by Assembly Item instead. Shows which products are most consistently missing their weight targets. Click a bar to list that item's individual measurements below the chart. |
 """)
 
 tab_compare, tab_work_orders, tab_items, tab_records = st.tabs(
@@ -214,32 +216,62 @@ with tab_work_orders:
         chart_data["Work Order Label"] = (
             chart_data["Assembly Item"].astype(str) + " | " + chart_data["Work Order"].astype(str)
         )
-        st.altair_chart(
+        wo_event = st.altair_chart(
             bar_chart(
                 chart_data,
                 "Average Absolute Variance",
                 "Work Order Label",
-                f"Top {len(chart_data)} Work Orders by Average Absolute Variance",
+                f"Top {len(chart_data)} Work Orders by Average Absolute Variance — click a bar to filter",
                 color=CHART_ORANGE,
+                selectable=True,
             ),
             width="stretch",
+            on_select="rerun",
+            key="defect_wo_chart",
         )
-    st.dataframe(work_order_summary, width="stretch", hide_index=True)
+        st.dataframe(work_order_summary, width="stretch", hide_index=True)
+
+        selected_label = selected_value(wo_event, "Work Order Label")
+        raw_columns = [
+            "Date", "Inspector", "Assembly Item", "Work Order", "Expected Weight",
+            "Actual Weight", "Variance", "Absolute Variance", "Weight Status",
+        ]
+        if selected_label:
+            sel_item, _, sel_wo = selected_label.partition(" | ")
+            wo_rows = filtered[
+                (filtered["Assembly Item"].astype(str) == sel_item)
+                & (filtered["Work Order"].astype(str) == sel_wo)
+            ]
+            st.subheader(f"Measurements — {selected_label} ({len(wo_rows)} rows)")
+            st.caption("Click the same bar again to clear.")
+            st.dataframe(
+                wo_rows.sort_values(["Date", "Source Row"])[
+                    [c for c in raw_columns if c in wo_rows.columns]
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+        else:
+            st.caption("Click a bar above to list that work order's individual measurements here.")
 
 with tab_items:
     item_summary = weight_item_summary(filtered, limit=top_n)
+    item_event = None
     if item_summary.empty:
         st.info("No assembly item measurements match the selected filters.")
     else:
-        st.altair_chart(
+        item_event = st.altair_chart(
             bar_chart(
                 item_summary,
                 "Average Absolute Variance",
                 "Assembly Item",
-                f"Top {len(item_summary)} Assembly Items by Average Absolute Variance",
+                f"Top {len(item_summary)} Assembly Items by Average Absolute Variance — click a bar to filter",
                 color=CHART_BLUE,
+                selectable=True,
             ),
             width="stretch",
+            on_select="rerun",
+            key="defect_item_chart",
         )
 
     inspector_summary = weight_inspector_summary(filtered)
@@ -250,6 +282,25 @@ with tab_items:
     with right:
         st.subheader("Inspector Summary")
         st.dataframe(inspector_summary, width="stretch", hide_index=True)
+
+    selected_item = selected_value(item_event, "Assembly Item")
+    raw_columns = [
+        "Date", "Inspector", "Assembly Item", "Work Order", "Expected Weight",
+        "Actual Weight", "Variance", "Absolute Variance", "Weight Status",
+    ]
+    if selected_item:
+        item_rows = filtered[filtered["Assembly Item"].astype(str) == selected_item]
+        st.subheader(f"Measurements — {selected_item} ({len(item_rows)} rows)")
+        st.caption("Click the same bar again to clear.")
+        st.dataframe(
+            item_rows.sort_values(["Date", "Work Order", "Source Row"])[
+                [c for c in raw_columns if c in item_rows.columns]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+    else:
+        st.caption("Click a bar above to list that assembly item's individual measurements here.")
 
 with tab_records:
     visible_columns = [

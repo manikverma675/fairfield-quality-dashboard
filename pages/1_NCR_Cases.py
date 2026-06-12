@@ -23,6 +23,7 @@ from quality_dashboard.ui import (
     file_missing,
     period_line_chart,
     render_header,
+    selected_value,
 )
 
 
@@ -106,7 +107,7 @@ with st.expander("Formulas & Methodology"):
 | FPC \| NCR Cases | Count of every case in the FPC \| NCR profile that passes the active filters. One row = one case. |
 | Open Backlog | Count of cases whose *Status* is Escalated. |
 | Closed | Count of cases whose *Stage* = "Closed". |
-| Median Closure Days | For every case where *Stage* = "Closed" and *Date Closed* is filled: *Date Closed − Date Created* gives the number of days it took to close. All those values are sorted and the middle one is chosen. Half of closed cases resolved faster than this number, half took longer. The median is used instead of an average so that a handful of very slow cases don't distort the result. |
+| Median Closure Days | For every case where *Stage* = "Closed" and *Date Closed* is filled: *Date Closed − Date Created* gives the number of days it took to close. All those values are sorted and the middle one is chosen. *Example: if five cases closed in 2, 4, 6, 9 and 40 days, the median is 6 — half closed faster, half slower.* The median is used instead of an average so that a handful of very slow cases don't distort the result (the 40-day case above barely moves the median but would inflate an average). |
 | Avg Open Age Days | For every case whose *Status* = "Escalated": *Today − Date Created* gives how many days the case has been sitting open. This card shows the average of those ages. |
 
 ---
@@ -117,7 +118,7 @@ with st.expander("Formulas & Methodology"):
 |---|---|
 | NCRs Created by Period — by Status | Cases are grouped by the month/week/quarter their *Date Created* falls in and split by their current *Status*. Each status gets its own line. Only the two statuses confirmed for FPC \| NCR are shown: **Escalated** (active open cases) and **Closed**. |
 | Median Closure Time by Period | Takes only cases where *Stage* = "Closed" and *Date Closed* is filled, groups them by the month/week/quarter their *Date Closed* falls in, and calculates the median closure days within each period. A rising line means it is taking longer to close cases over time. |
-| NCR Cases by Status | Groups all filtered FPC \| NCR cases by their current *Status* and counts how many are in each. Only Escalated and Closed are shown, as those are the only statuses confirmed for this profile. |
+| NCR Cases by Status | Groups all filtered FPC \| NCR cases by their current *Status* and counts how many are in each. Only Escalated and Closed are shown, as those are the only statuses confirmed for this profile. Click a bar to list those cases in a table below the chart. |
 
 ---
 
@@ -178,9 +179,25 @@ with tab_trend:
 
     status_summary = ncr_status_summary(filtered)
     status_summary = status_summary[status_summary["Status"].isin({"Escalated", "Closed"})]
-    st.altair_chart(
-        bar_chart(status_summary, "Cases", "Status", "NCR Cases by Status", color=CHART_RED),
+    status_event = st.altair_chart(
+        bar_chart(status_summary, "Cases", "Status", "NCR Cases by Status — click a bar to filter", color=CHART_RED, selectable=True),
         width="stretch",
+        on_select="rerun",
+        key="ncr_status_chart",
+    )
+    selected_status = selected_value(status_event, "Status")
+    status_rows = filtered[filtered["Status"].isin({"Escalated", "Closed"})]
+    if selected_status:
+        status_rows = status_rows[status_rows["Status"] == selected_status]
+        st.caption(f"Records for Status = {selected_status} ({len(status_rows)} cases). Click the same bar again to clear.")
+    else:
+        st.caption("Click a bar above to list the underlying cases here.")
+    st.dataframe(
+        status_rows.sort_values("Date Created", ascending=False)[
+            [c for c in ["Number", "Status", "Stage", "Date Created", "Date Closed", "Company", "Assigned To", "Subject"] if c in status_rows.columns]
+        ],
+        width="stretch",
+        hide_index=True,
     )
 
 BUCKET_RANGES = {

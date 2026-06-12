@@ -21,6 +21,7 @@ from quality_dashboard.ui import (
     empty_state,
     file_missing,
     render_header,
+    selected_value,
 )
 
 
@@ -105,7 +106,7 @@ This page filters the NCR Cases file to only rows where **Profile = "FPC | NCR"*
 | Complaints | Count of every complaint row that passes the active filters. One row = one complaint case. |
 | Open | Count of complaints whose *Status* is Escalated. |
 | Closed | Count of complaints whose *Stage* = "Closed". |
-| Median Closure Days | For every complaint where *Stage* = "Closed" and *Date Closed* is filled: *Date Closed − Date Created* gives the number of days it took to resolve. All those values are sorted and the middle one is chosen. Half of complaints were resolved faster than this number, half took longer. The median is used so that a few very slow cases don't skew the result. |
+| Median Closure Days | For every complaint where *Stage* = "Closed" and *Date Closed* is filled: *Date Closed − Date Created* gives the number of days it took to resolve. All those values are sorted and the middle one is chosen. *Example: closures of 2, 4, 6, 9 and 40 days give a median of 6.* The median is used so that a few very slow cases don't skew the result. |
 
 ---
 
@@ -114,8 +115,8 @@ This page filters the NCR Cases file to only rows where **Profile = "FPC | NCR"*
 | Chart | How it is calculated |
 |---|---|
 | Open / Closed by Period | Complaints are grouped by the month/week/quarter their *Date Created* falls in, then split into two lines: the orange line counts cases from that period whose current *Status* is still open (Escalated), and the blue line counts cases whose *Stage* = "Closed". Both lines track cases by when they were opened, not when they were closed. |
-| Complaint Status | Groups all filtered complaints by their current *Status* value and counts how many are in each status. |
-| Top Companies | Groups all filtered complaints by *Company*, counts how many complaints each company has generated, and ranks from most to least. The dropdown controls how many companies appear — select **All** to show every company. |
+| Complaint Status | Groups all filtered complaints by their current *Status* value and counts how many are in each status. Click a bar to list those complaints in a table below the chart. |
+| Top Companies | Groups all filtered complaints by *Company*, counts how many complaints each company has generated, and ranks from most to least. The dropdown controls how many companies appear — select **All** to show every company. Click a bar to list that company's complaints below the chart. |
 
 ---
 
@@ -123,7 +124,7 @@ This page filters the NCR Cases file to only rows where **Profile = "FPC | NCR"*
 
 | Chart | How it is calculated |
 |---|---|
-| Open Complaint Aging | Looks only at complaints whose *Status* is Escalated. For each, *Today − Date Created* is calculated. Each complaint is placed into one of six age buckets: **0–7 days** (just opened), **8–30 days** (recent), **31–60 days** (aging), **61–90 days** (old), **91–180 days** (very old), **181+ days** (critical). A taller bar means more unresolved complaints are sitting in that age range. |
+| Open Complaint Aging | Looks only at complaints whose *Status* is Escalated. For each, *Today − Date Created* is calculated. Each complaint is placed into one of six age buckets: **0–7 days** (just opened), **8–30 days** (recent), **31–60 days** (aging), **61–90 days** (old), **91–180 days** (very old), **181+ days** (critical). A taller bar means more unresolved complaints are sitting in that age range. Click a bar to filter the backlog table below to just that age range. |
 """)
 
 tab_trend, tab_backlog, tab_records = st.tabs(["Trend", "Backlog", "Records"])
@@ -142,25 +143,62 @@ with tab_trend:
 
     left, right = st.columns(2)
     with left:
-        st.altair_chart(
-            bar_chart(ncr_status_summary(filtered), "Cases", "Status", "Complaint Status"),
+        status_event = st.altair_chart(
+            bar_chart(ncr_status_summary(filtered), "Cases", "Status", "Complaint Status — click to filter", selectable=True),
             width="stretch",
+            on_select="rerun",
+            key="cc_status_chart",
         )
     with right:
         company_summary = ncr_company_summary(filtered, limit=top_n)
-        st.altair_chart(
-            bar_chart(company_summary, "Cases", "Company", f"Top {len(company_summary)} Companies"),
+        company_event = st.altair_chart(
+            bar_chart(company_summary, "Cases", "Company", f"Top {len(company_summary)} Companies — click to filter", selectable=True),
             width="stretch",
+            on_select="rerun",
+            key="cc_company_chart",
         )
+
+    selected_status = selected_value(status_event, "Status")
+    selected_company = selected_value(company_event, "Company")
+    trend_rows = filtered
+    if selected_status:
+        trend_rows = trend_rows[trend_rows["Status"] == selected_status]
+    if selected_company:
+        trend_rows = trend_rows[trend_rows["Company"] == selected_company]
+
+    if selected_status or selected_company:
+        picked = " · ".join(p for p in [selected_status, selected_company] if p)
+        st.caption(f"Records for {picked} ({len(trend_rows)} complaints). Click the same bar again to clear.")
+        st.dataframe(
+            trend_rows.sort_values("Date Created", ascending=False)[
+                [c for c in ["Number", "Status", "Date Created", "Date Closed", "Company", "Subject", "Assigned To"] if c in trend_rows.columns]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+    else:
+        st.caption("Click a bar above to list the underlying complaints here.")
+
+BUCKET_RANGES = {
+    "0-7":    (0,   7),
+    "8-30":   (8,   30),
+    "31-60":  (31,  60),
+    "61-90":  (61,  90),
+    "91-180": (91,  180),
+    "181+":   (181, float("inf")),
+}
 
 with tab_backlog:
     aging = open_case_aging(filtered)
     if aging.empty:
         st.info("No open customer complaint backlog in the selected filters.")
+        aging_event = None
     else:
-        st.altair_chart(
-            bar_chart(aging, "Cases", "Age Bucket", "Open Complaint Aging", color=CHART_ORANGE),
+        aging_event = st.altair_chart(
+            bar_chart(aging, "Cases", "Age Bucket", "Open Complaint Aging — click a bar to filter", color=CHART_ORANGE, selectable=True),
             width="stretch",
+            on_select="rerun",
+            key="cc_aging_chart",
         )
 
     open_columns = [
@@ -172,9 +210,22 @@ with tab_backlog:
         "Subject",
         "Assigned To",
     ]
-    st.dataframe(
+    open_cases = (
         filtered[filtered["Status"].isin(OPEN_STATUSES)]
-        .sort_values("Age Days", ascending=False)[open_columns],
+        .sort_values("Age Days", ascending=False)
+    )
+
+    selected_bucket = selected_value(aging_event, "Age Bucket")
+    if selected_bucket and selected_bucket in BUCKET_RANGES:
+        lo, hi = BUCKET_RANGES[selected_bucket]
+        open_cases = open_cases[(open_cases["Age Days"] >= lo) & (open_cases["Age Days"] <= hi)]
+        st.subheader(f"Open Complaint Backlog — {selected_bucket} days ({len(open_cases)} complaints)")
+        st.caption("Click the same bar again to clear.")
+    else:
+        st.subheader(f"Open Complaint Backlog ({len(open_cases)} complaints)")
+
+    st.dataframe(
+        open_cases[open_columns],
         width="stretch",
         hide_index=True,
     )
