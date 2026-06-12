@@ -10,7 +10,7 @@ from quality_dashboard.calculations import (
     ncr_summary,
     open_case_aging,
 )
-from quality_dashboard.config import NCR_CASES_FILE
+from quality_dashboard.config import NCR_CASES_FILE, OPEN_STATUSES
 from quality_dashboard.data_loaders import load_ncr_cases
 from quality_dashboard.metrics import PERIOD_OPTIONS, date_bounds, format_number
 from quality_dashboard.ui import (
@@ -83,31 +83,46 @@ col4.metric("Median Closure Days", format_number(summary["median_closure_days"])
 
 with st.expander("Formulas & Methodology"):
     st.markdown("""
-**Case Definition**
+**What counts as a Customer Complaint?**
 
-Customer Complaints are NCR cases where **Profile = "FPC | NCR"** AND **Assigned To = "Sheri King"**. All other NCR cases are excluded from this view.
+This page filters the NCR Cases file to only rows where **Profile = "FPC | NCR"** AND **Assigned To = "Sheri King"**. Every other NCR case is excluded. The sidebar filters (date range, status, company) narrow this set further.
+
+---
+
+**How Open vs. Closed is determined**
+
+- A complaint is counted as **Open** when its *Status* = **"Escalated"**. This is the only status confirmed to belong to FPC | NCR active cases.
+- A complaint is counted as **Closed** when its *Stage* = **"Closed"** and *Date Closed* is filled. The *Date Closed* field is used to calculate how long it took to resolve.
+- Cases with other status or stage values are not counted in either bucket.
+
+---
 
 **Metric Cards**
-| Metric | Formula |
+
+| Metric | How it is calculated |
 |---|---|
-| Complaints | COUNT of all complaint cases matching the selected filters |
-| Open | COUNT of cases where *Date Closed* is blank |
-| Closed | COUNT of cases where *Date Closed* is filled |
-| Median Closure Days | MEDIAN(*Closure Days*) for closed complaints in the filtered set |
+| Complaints | Count of every complaint row that passes the active filters. One row = one complaint case. |
+| Open | Count of complaints whose *Status* is Escalated. |
+| Closed | Count of complaints whose *Stage* = "Closed". |
+| Median Closure Days | For every complaint where *Stage* = "Closed" and *Date Closed* is filled: *Date Closed − Date Created* gives the number of days it took to resolve. All those values are sorted and the middle one is chosen. Half of complaints were resolved faster than this number, half took longer. The median is used so that a few very slow cases don't skew the result. |
+
+---
 
 **Trend Charts**
-| Chart | Formula |
+
+| Chart | How it is calculated |
 |---|---|
-| Open / Closed by Period | COUNT of complaints grouped by *Date Created* period, split into Open (no close date) vs Closed |
-| Complaint Status | COUNT grouped by *Status* value |
-| Top Companies | COUNT grouped by *Company*, ranked descending — top N controlled by the slider |
+| Open / Closed by Period | Complaints are grouped by the month/week/quarter their *Date Created* falls in, then split into two lines: the orange line counts cases from that period whose current *Status* is still open (Escalated), and the blue line counts cases whose *Stage* = "Closed". Both lines track cases by when they were opened, not when they were closed. |
+| Complaint Status | Groups all filtered complaints by their current *Status* value and counts how many are in each status. |
+| Top Companies | Groups all filtered complaints by *Company*, counts how many complaints each company has generated, and ranks from most to least. The slider controls how many companies appear. |
+
+---
 
 **Backlog**
-| Chart | Formula |
-|---|---|
-| Open Complaint Aging | Open cases bucketed by *Age Days*: 0–7 · 8–30 · 31–60 · 61–90 · 91–180 · 181+ days |
 
-*Age Days* and *Closure Days* are computed in the source file (today − Date Created / Date Closed − Date Created).
+| Chart | How it is calculated |
+|---|---|
+| Open Complaint Aging | Looks only at complaints whose *Status* is Escalated. For each, *Today − Date Created* is calculated. Each complaint is placed into one of six age buckets: **0–7 days** (just opened), **8–30 days** (recent), **31–60 days** (aging), **61–90 days** (old), **91–180 days** (very old), **181+ days** (critical). A taller bar means more unresolved complaints are sitting in that age range. |
 """)
 
 tab_trend, tab_backlog, tab_records = st.tabs(["Trend", "Backlog", "Records"])
@@ -157,7 +172,7 @@ with tab_backlog:
         "Assigned To",
     ]
     st.dataframe(
-        filtered[filtered["Date Closed"].isna()]
+        filtered[filtered["Status"].isin(OPEN_STATUSES)]
         .sort_values("Age Days", ascending=False)[open_columns],
         width="stretch",
         hide_index=True,

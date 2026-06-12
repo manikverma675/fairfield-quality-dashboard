@@ -135,32 +135,41 @@ st.caption(
 
 with st.expander("Formulas & Methodology"):
     st.markdown("""
-**Derived Fields** *(computed per measurement row)*
-| Field | Formula |
-|---|---|
-| Variance | Actual Weight − Expected Target |
-| Absolute Variance | \|Actual Weight − Expected Target\| |
-| Weight Status | **Within Range** if Actual falls inside the tolerance band around Expected Target; **Below Range / Below Expected** if under; **Above Range / Above Expected** if over; **Expected Unknown** if no parseable target exists |
+**How weight comparisons work**
 
-A measurement is **comparable** only when *Expected Target* is known and parseable. Non-comparable rows are counted but excluded from all variance calculations.
+Each row in the source file is one weight measurement taken by an inspector. The source file also contains an expected weight (either a single target value or a low–high range) for each assembly item and work order. The dashboard computes the following fields for every row:
+
+| Field | How it is calculated |
+|---|---|
+| Variance | *Actual Weight − Expected Target.* Positive = product is heavier than expected. Negative = product is lighter than expected. Zero = exactly on target. |
+| Absolute Variance | The size of the error regardless of direction: \|Actual Weight − Expected Target\|. A measurement that is 0.5 oz over and one that is 0.5 oz under both produce an Absolute Variance of 0.5. This is the main accuracy indicator because it doesn't let over- and under-measurements cancel each other out. |
+| Weight Status | **Within Range** — actual weight falls inside the tolerance band (low to high). **Below Range / Below Expected** — actual is below the lower boundary or below a single target. **Above Range / Above Expected** — actual is above the upper boundary or above a single target. **Expected Unknown** — the expected weight field was blank or could not be parsed, so no comparison is possible. |
+
+A measurement is **comparable** only when the expected weight could be read from the source file. Rows flagged as "Expected Unknown" are counted in the totals but excluded from all variance calculations.
+
+---
 
 **Metric Cards**
-| Metric | Formula |
+
+| Metric | How it is calculated |
 |---|---|
-| Avg Variance | AVERAGE(Variance) over comparable measurements — positive and negative errors can cancel |
-| Avg Abs Variance | AVERAGE(\|Variance\|) — treats over and under equally; use this as the primary accuracy indicator |
-| Max Abs Variance | MAX(\|Variance\|) — worst single measurement in the filtered set |
-| Within Range | COUNT where Weight Status = "Within Range" |
-| Below Expected | COUNT where Weight Status is "Below Range" or "Below Expected" |
-| Above Expected | COUNT where Weight Status is "Above Range" or "Above Expected" |
+| Avg Variance | Sum of all (Actual − Expected) values for comparable measurements ÷ count. Because positive and negative errors cancel, this can read near zero even when there is heavy variation. A value close to zero does **not** mean the process is accurate — use Avg Abs Variance for that. |
+| Avg Abs Variance | Sum of all \|Actual − Expected\| values for comparable measurements ÷ count. This is the primary accuracy metric. It tells you the typical size of the error across all measurements. |
+| Max Abs Variance | The single largest \|Actual − Expected\| value in the filtered set — the worst individual measurement recorded. |
+| Within Range | Count of measurements where the actual weight fell inside the defined tolerance band. |
+| Below Expected | Count of measurements where the actual weight was below the expected target or tolerance floor. |
+| Above Expected | Count of measurements where the actual weight was above the expected target or tolerance ceiling. |
+
+---
 
 **Charts**
-| Chart | Formula |
+
+| Chart | How it is calculated |
 |---|---|
-| Measured vs Expected (scatter) | Each point = one measurement. X-axis = Expected Target, Y-axis = Actual Weight. The dashed diagonal = perfect agreement (Variance = 0). Points above the line are heavier than expected; below are lighter. |
-| Avg Absolute Variance by Period | AVERAGE(\|Variance\|) for comparable measurements grouped by the selected period grain |
-| Work Orders by Avg Abs Variance | AVERAGE(\|Variance\|) per work order, ranked highest first — highlights the most variable production runs |
-| Assembly Items by Avg Abs Variance | AVERAGE(\|Variance\|) per assembly item, ranked highest first |
+| Measured vs Expected (scatter) | Each dot is one measurement. X-axis = the expected target weight; Y-axis = the actual weight recorded by the inspector. The dashed diagonal line represents perfect accuracy — a dot exactly on the line means Actual = Expected (zero error). Dots above the line are heavier than expected; dots below are lighter. Clusters far from the diagonal reveal a consistent bias. Color shows the Weight Status of each measurement. |
+| Avg Absolute Variance by Period | For each period (day/week/month), takes all comparable measurements that fall in that period and calculates the average \|Actual − Expected\|. A rising trend means inspections are becoming less consistent over time. |
+| Work Orders by Avg Abs Variance | For each work order, calculates the average \|Actual − Expected\| across all its measurements and ranks from highest to lowest. Work orders at the top of the list are the most inconsistent production runs. |
+| Assembly Items by Avg Abs Variance | Same calculation as Work Orders above, but grouped by Assembly Item instead. Shows which products are most consistently missing their weight targets. |
 """)
 
 tab_compare, tab_work_orders, tab_items, tab_records = st.tabs(

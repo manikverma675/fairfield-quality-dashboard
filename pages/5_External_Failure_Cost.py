@@ -74,33 +74,41 @@ st.caption(
 
 with st.expander("Formulas & Methodology"):
     st.markdown("""
-**Data Sources** — this page draws from three separate sheets in the source file:
+**Where the numbers come from**
 
-| Source | Used For |
-|---|---|
-| Department Summary sheet | Dept Summary Total — Amazon's own rolled-up total by department |
-| Line-Item Detail sheet | Top Items Cost, Claim Lines, and the reason/item charts — filterable by claim reason |
-| Defective & Damaged sheet | Defect/Damage Cost and Units — separate product-level breakdown, not linked to reason filter |
+This page pulls from three separate tabs inside the source Excel file. They are independent Amazon reports and their totals will not exactly match each other — this is expected.
+
+| Tab | What it contains | Affected by claim reason filter? |
+|---|---|---|
+| Department Summary | Amazon's rolled-up claim totals by department. One row per department. | No — always shows the full period total. |
+| Line-Item Detail (Top Claimed Items) | Individual claim lines with one row per item per claim reason. This is the detail behind the department totals. | Yes — filtering by reason removes rows from this sheet only. |
+| Defective & Damaged | A separate product-level breakdown of defective merchandise and damaged-in-transit claims. | No — not linked to the claim reason filter. |
+
+---
 
 **Metric Cards**
-| Metric | Formula |
+
+| Metric | How it is calculated |
 |---|---|
-| Dept Summary Total | SUM(*Claim Amount*) from the Department Summary sheet — **not affected by any filter** |
-| Top Items Cost | SUM(*Claim Amount*) from the Line-Item Detail sheet, filtered by selected claim reason(s) |
-| Claim Lines | COUNT of rows in the Line-Item Detail sheet after filtering |
-| Defect/Damage Cost † | SUM(*Total Claim $*) from the Defective & Damaged sheet |
-| Defect/Damage Units † | SUM(*Total Units*) from the Defective & Damaged sheet |
+| Dept Summary Total | Sum of the *Claim Amount* column across every row in the Department Summary tab. This is Amazon's stated grand total for the period and **does not change** when you filter by claim reason. |
+| Top Items Cost | Sum of *Claim Amount* from the Line-Item Detail tab, after applying the selected claim reason filter. This will always be less than or equal to the Dept Summary Total because not every claim type has individual item lines in the detail sheet. |
+| Claim Lines | Count of rows in the Line-Item Detail tab after filtering. One row = one item charged under one claim reason. |
+| Defect/Damage Cost † | Sum of the *Total Claim $* column in the Defective & Damaged tab across all rows. |
+| Defect/Damage Units † | Sum of the *Total Units* column in the Defective & Damaged tab across all rows. |
 
-† These figures come from a separate sheet and are **not affected by the claim reason filter**.
+† The Defect/Damage figures come from a completely separate tab and are **not affected by the claim reason filter**.
 
-The gap between *Dept Summary Total* and *Top Items Cost* represents claims that appear in the department summary but have no matching line in the detail sheet.
+The dollar gap between *Dept Summary Total* and *Top Items Cost* is money that Amazon charged at the department level but did not break down to individual items in the detail sheet — for example, freight allowances or category-level deductions.
+
+---
 
 **Charts**
-| Chart | Formula |
+
+| Chart | How it is calculated |
 |---|---|
-| Claim Cost by Reason | SUM(*Claim Amount*) from the Line-Item sheet, grouped by *Claim Reason* |
-| Claim Cost by Department | SUM(*Claim Amount*) from the Department Summary sheet, grouped by *Department Description* |
-| Top Items by Claim Cost | SUM(*Claim Amount*) from the Line-Item sheet, grouped by *Item Description*, ranked descending |
+| Claim Cost by Reason | Groups every row in the Line-Item Detail tab by *Claim Reason* and sums their *Claim Amount*. Shows which type of claim (e.g. damaged, defective, shortage) is costing the most money. |
+| Claim Cost by Department | Groups the Department Summary tab by *Department Description* and sums *Claim Amount* per department. Shows which product departments are generating the most claim dollars according to Amazon's own rolled-up report. |
+| Top Items by Claim Cost | Groups the Line-Item Detail tab by *Item Description*, sums *Claim Amount* per item, and ranks from highest to lowest. Shows which specific products are responsible for the most claim dollars in the detail sheet. The slider controls how many items appear. |
 """)
 
 tab_cost, tab_items, tab_records = st.tabs(["Cost", "Items", "Records"])

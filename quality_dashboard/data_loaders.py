@@ -8,9 +8,11 @@ from pathlib import Path
 import pandas as pd
 
 from quality_dashboard.config import (
+    CLOSED_STAGE,
     DEFECT_FILE,
     EXTERNAL_FAILURE_FILE,
     NCR_CASES_FILE,
+    OPEN_STATUSES,
     SCRAP_FILE,
 )
 
@@ -115,7 +117,8 @@ def load_ncr_cases(path: Path = NCR_CASES_FILE, as_of: pd.Timestamp | None = Non
 
     as_of = pd.Timestamp.today().normalize() if as_of is None else pd.Timestamp(as_of)
     close_or_as_of = cases["Date Closed"].fillna(as_of)
-    cases["Is Open"] = cases["Date Closed"].isna()
+    cases["Is Open"] = cases["Status"].isin(OPEN_STATUSES)
+    cases["Is Closed"] = cases.get("Stage", pd.Series(dtype=str)).eq(CLOSED_STAGE)
     cases["Closure Hours"] = (
         cases["Date Closed"] - cases["Date Created"]
     ).dt.total_seconds() / 3600

@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from quality_dashboard.config import CLOSED_STAGE, OPEN_STATUSES
 from quality_dashboard.metrics import add_period
-
-
-OPEN_STATUSES = {"Escalated", "In Progress", "Not Started", "Paused", "Re-Opened"}
 
 
 def filter_by_date(
@@ -49,13 +47,15 @@ def ncr_summary(cases: pd.DataFrame) -> dict[str, float]:
             "avg_age_days": float("nan"),
         }
 
-    closed = cases[cases["Date Closed"].notna()]
+    is_closed = cases.get("Stage", pd.Series(dtype=str)).eq(CLOSED_STAGE)
+    is_open = cases["Status"].isin(OPEN_STATUSES)
+    closed = cases[is_closed & cases["Date Closed"].notna()]
     return {
         "total": int(len(cases)),
-        "open": int(cases["Date Closed"].isna().sum()),
-        "closed": int(cases["Date Closed"].notna().sum()),
+        "open": int(is_open.sum()),
+        "closed": int(is_closed.sum()),
         "median_closure_days": closed["Closure Days"].median(),
-        "avg_age_days": cases[cases["Date Closed"].isna()]["Age Days"].mean(),
+        "avg_age_days": cases[is_open]["Age Days"].mean(),
     }
 
 
@@ -72,8 +72,8 @@ def ncr_created_trend(cases: pd.DataFrame, grain: str) -> pd.DataFrame:
         .agg(
             **{
                 "Created Cases": ("Number", "count"),
-                "Open Cases": ("Date Closed", lambda values: values.isna().sum()),
-                "Closed Cases": ("Date Closed", lambda values: values.notna().sum()),
+                "Open Cases": ("Status", lambda s: s.isin(OPEN_STATUSES).sum()),
+                "Closed Cases": ("Stage", lambda s: s.eq(CLOSED_STAGE).sum()),
             }
         )
         .sort_values("Period")
@@ -81,8 +81,26 @@ def ncr_created_trend(cases: pd.DataFrame, grain: str) -> pd.DataFrame:
     return trend
 
 
+def ncr_status_trend(cases: pd.DataFrame, grain: str) -> pd.DataFrame:
+    """Cases created per period broken down by current Status — one row per (Period, Status)."""
+    if cases.empty:
+        return pd.DataFrame(columns=["Period", "Status", "Cases"])
+
+    framed = add_period(cases.dropna(subset=["Date Created"]), "Date Created", grain)
+    if framed.empty:
+        return pd.DataFrame(columns=["Period", "Status", "Cases"])
+
+    return (
+        framed.groupby(["Period", "Status"], as_index=False)
+        .agg(Cases=("Number", "count"))
+        .sort_values(["Period", "Status"])
+    )
+
+
 def ncr_closure_trend(cases: pd.DataFrame, grain: str) -> pd.DataFrame:
-    closed = cases.dropna(subset=["Date Closed", "Closure Days"]).copy()
+    closed = cases[
+        cases.get("Stage", pd.Series(dtype=str)).eq(CLOSED_STAGE) & cases["Date Closed"].notna()
+    ].dropna(subset=["Closure Days"]).copy()
     if closed.empty:
         return pd.DataFrame(columns=["Period", "Closed Cases", "Median Closure Days", "Average Closure Days"])
 
@@ -125,7 +143,7 @@ def ncr_company_summary(cases: pd.DataFrame, limit: int = 15) -> pd.DataFrame:
 
 
 def open_case_aging(cases: pd.DataFrame) -> pd.DataFrame:
-    open_cases = cases[cases["Date Closed"].isna()].copy()
+    open_cases = cases[cases["Status"].isin(OPEN_STATUSES)].copy()
     if open_cases.empty:
         return pd.DataFrame(columns=["Age Bucket", "Cases"])
 

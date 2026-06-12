@@ -7,16 +7,15 @@ from quality_dashboard.calculations import (
     filter_ncr_profile,
     ncr_closure_trend,
     ncr_company_summary,
-    ncr_created_trend,
     ncr_status_summary,
+    ncr_status_trend,
     ncr_summary,
     open_case_aging,
 )
-from quality_dashboard.config import NCR_CASES_FILE
+from quality_dashboard.config import NCR_CASES_FILE, OPEN_STATUSES
 from quality_dashboard.data_loaders import load_ncr_cases
 from quality_dashboard.metrics import PERIOD_OPTIONS, date_bounds, format_number
 from quality_dashboard.ui import (
-    CHART_BLUE,
     CHART_ORANGE,
     CHART_RED,
     bar_chart,
@@ -79,7 +78,7 @@ if filtered.empty:
 
 summary = ncr_summary(filtered)
 col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("NCR Cases", f"{summary['total']:,}")
+col1.metric("FPC | NCR Cases", f"{summary['total']:,}")
 col2.metric("Open Backlog", f"{summary['open']:,}")
 col3.metric("Closed", f"{summary['closed']:,}")
 col4.metric("Median Closure Days", format_number(summary["median_closure_days"]))
@@ -87,52 +86,80 @@ col5.metric("Avg Open Age Days", format_number(summary["avg_age_days"]))
 
 with st.expander("Formulas & Methodology"):
     st.markdown("""
+**Data scope:** Only rows where Profile = "FPC | NCR" are included. All sidebar filters (date range, status, assignee) narrow this set further.
+
+---
+
+**How Open vs. Closed is determined**
+
+- A case is counted as **Open** when its *Status* = **"Escalated"**. This is the only status confirmed to belong to FPC | NCR active cases.
+- A case is counted as **Closed** when its *Stage* = **"Closed"** and *Date Closed* is filled. The *Date Closed* field is used to calculate how long it took and when it was resolved.
+- Cases with other status or stage values (e.g. Stage = "Open", Status = "In Progress", Status = "Paused") are not counted in either bucket.
+
+---
+
 **Metric Cards**
-| Metric | Formula |
+
+| Metric | How it is calculated |
 |---|---|
-| NCR Cases | COUNT of all NCR cases matching the selected filters |
-| Open Backlog | COUNT of cases where *Date Closed* is blank |
-| Closed | COUNT of cases where *Date Closed* is filled |
-| Median Closure Days | MEDIAN(*Closure Days*) for closed cases in the filtered set |
-| Avg Open Age Days | AVERAGE(*Age Days*) for open cases (no close date) |
+| FPC \| NCR Cases | Count of every case in the FPC \| NCR profile that passes the active filters. One row = one case. |
+| Open Backlog | Count of cases whose *Status* is Escalated. |
+| Closed | Count of cases whose *Stage* = "Closed". |
+| Median Closure Days | For every case where *Stage* = "Closed" and *Date Closed* is filled: *Date Closed − Date Created* gives the number of days it took to close. All those values are sorted and the middle one is chosen. Half of closed cases resolved faster than this number, half took longer. The median is used instead of an average so that a handful of very slow cases don't distort the result. |
+| Avg Open Age Days | For every case whose *Status* = "Escalated": *Today − Date Created* gives how many days the case has been sitting open. This card shows the average of those ages. |
+
+---
 
 **Trend Charts**
-| Chart | Formula |
+
+| Chart | How it is calculated |
 |---|---|
-| NCRs Created by Period | COUNT of cases grouped by *Date Created*, bucketed into the selected period grain |
-| Median Closure Time by Period | MEDIAN(*Closure Days*) for cases whose *Date Closed* falls in each period |
-| NCR Cases by Status | COUNT of cases grouped by *Status* value |
+| NCRs Created by Period — by Status | Cases are grouped by the month/week/quarter their *Date Created* falls in and split by their current *Status*. Each status gets its own line. Only the two statuses confirmed for FPC \| NCR are shown: **Escalated** (active open cases) and **Closed**. |
+| Median Closure Time by Period | Takes only cases where *Stage* = "Closed" and *Date Closed* is filled, groups them by the month/week/quarter their *Date Closed* falls in, and calculates the median closure days within each period. A rising line means it is taking longer to close cases over time. |
+| NCR Cases by Status | Groups all filtered FPC \| NCR cases by their current *Status* and counts how many are in each. Only Escalated and Closed are shown, as those are the only statuses confirmed for this profile. |
+
+---
 
 **Backlog Charts**
-| Chart | Formula |
-|---|---|
-| Open NCR Aging | Open cases bucketed by *Age Days*: 0–7 · 8–30 · 31–60 · 61–90 · 91–180 · 181+ days |
-| Top NCR Companies | COUNT of cases grouped by *Company*, ranked descending — top N controlled by the slider |
 
-**Data scope:** Profile = "FPC | NCR". *Age Days* and *Closure Days* are computed in the source file (today − Date Created / Date Closed − Date Created).
+| Chart | How it is calculated |
+|---|---|
+| Open NCR Aging | Looks only at cases with an open status (Escalated). For each, *Today − Date Created* is calculated. Cases are placed into six age buckets: **0–7 days** (just opened), **8–30 days** (recent), **31–60 days** (aging), **61–90 days** (old), **91–180 days** (very old), **181+ days** (critical). Taller bars mean more open cases in that age range. Click a bar to filter the table below to just those cases. |
+| Top NCR Companies | Looks only at open (Escalated) cases and groups them by *Company*, counts how many open cases each company has, and displays the top N ranked from most to least. The slider in the sidebar controls how many companies appear. Click a bar to filter the open backlog table to just that company's cases. |
 """)
 
 tab_trend, tab_backlog, tab_records = st.tabs(["Trend", "Backlog", "Records"])
 
 with tab_trend:
-    created_trend = ncr_created_trend(filtered, grain)
+    status_trend = ncr_status_trend(filtered, grain)
+    status_trend = status_trend[status_trend["Status"].isin({"Escalated", "Closed"})]
     closure_trend = ncr_closure_trend(filtered, grain)
 
     left, right = st.columns(2)
     with left:
-        st.altair_chart(
-            period_line_chart(
-                created_trend,
-                "Created Cases",
-                f"NCRs Created by {grain.lower()} period",
-                color=CHART_BLUE,
-                extra_tooltips=[
-                    alt.Tooltip("Open Cases:Q", format=","),
-                    alt.Tooltip("Closed Cases:Q", format=","),
-                ],
-            ),
-            width="stretch",
-        )
+        if status_trend.empty:
+            st.info("No NCR cases match the selected filters.")
+        else:
+            status_line_chart = (
+                alt.Chart(status_trend)
+                .mark_line(point=True, strokeWidth=2.5)
+                .encode(
+                    x=alt.X("Period:T", title=None),
+                    y=alt.Y("Cases:Q", title="Cases"),
+                    color=alt.Color(
+                        "Status:N",
+                        title="Status",
+                        legend=alt.Legend(orient="bottom"),
+                    ),
+                    tooltip=[
+                        alt.Tooltip("Period:T", title="Period"),
+                        alt.Tooltip("Status:N", title="Status"),
+                        alt.Tooltip("Cases:Q", title="Cases", format=","),
+                    ],
+                )
+                .properties(title=f"NCRs Created by {grain.lower()} period — by Status", height=340)
+            )
+            st.altair_chart(status_line_chart, width="stretch")
     with right:
         if closure_trend.empty:
             st.info("No closed NCRs match the selected filters.")
@@ -149,6 +176,7 @@ with tab_trend:
             )
 
     status_summary = ncr_status_summary(filtered)
+    status_summary = status_summary[status_summary["Status"].isin({"Escalated", "Closed"})]
     st.altair_chart(
         bar_chart(status_summary, "Cases", "Status", "NCR Cases by Status", color=CHART_RED),
         width="stretch",
@@ -164,9 +192,10 @@ BUCKET_RANGES = {
 }
 
 with tab_backlog:
+    open_filtered = filtered[filtered["Status"].isin(OPEN_STATUSES)]
     left, right = st.columns(2)
     with left:
-        aging = open_case_aging(filtered)
+        aging = open_case_aging(open_filtered)
         if aging.empty:
             st.info("No open NCR backlog in the selected filters.")
             aging_event = None
@@ -178,10 +207,12 @@ with tab_backlog:
                 key="ncr_aging_chart",
             )
     with right:
-        companies = ncr_company_summary(filtered, limit=top_n)
-        st.altair_chart(
-            bar_chart(companies, "Cases", "Company", f"Top {len(companies)} NCR Companies"),
+        companies = ncr_company_summary(open_filtered, limit=top_n)
+        company_event = st.altair_chart(
+            bar_chart(companies, "Cases", "Company", f"Top {len(companies)} NCR Companies — click a bar to filter", selectable=True),
             width="stretch",
+            on_select="rerun",
+            key="ncr_company_chart",
         )
 
     selected_bucket = None
@@ -189,6 +220,14 @@ with tab_backlog:
         points = aging_event.selection.get("sel", [])
         if points:
             selected_bucket = str(points[0]["Age Bucket"])
+    except (AttributeError, KeyError, TypeError, IndexError):
+        pass
+
+    selected_company = None
+    try:
+        points = company_event.selection.get("sel", [])
+        if points:
+            selected_company = str(points[0]["Company"])
     except (AttributeError, KeyError, TypeError, IndexError):
         pass
 
@@ -202,18 +241,26 @@ with tab_backlog:
         "Subject",
         "Item",
     ]
-    open_cases = filtered[filtered["Date Closed"].isna()].sort_values("Age Days", ascending=False)
+    open_cases = open_filtered.sort_values("Age Days", ascending=False)
 
     if selected_bucket and selected_bucket in BUCKET_RANGES:
         lo, hi = BUCKET_RANGES[selected_bucket]
         open_cases = open_cases[
             (open_cases["Age Days"] >= lo) & (open_cases["Age Days"] <= hi)
         ]
-        st.subheader(f"Open NCR Backlog — {selected_bucket} days ({len(open_cases)} cases)")
-        st.caption("Click the same bar again to deselect.")
+        label = f"Open NCR Backlog — {selected_bucket} days ({len(open_cases)} cases)"
+        deselect_hint = "Click the same bar again to deselect."
+    elif selected_company:
+        open_cases = open_cases[open_cases["Company"] == selected_company]
+        label = f"Open NCR Backlog — {selected_company} ({len(open_cases)} cases)"
+        deselect_hint = "Click the same bar again to deselect."
     else:
-        st.subheader(f"Open NCR Backlog ({len(open_cases)} cases)")
+        label = f"Open NCR Backlog ({len(open_cases)} cases)"
+        deselect_hint = None
 
+    st.subheader(label)
+    if deselect_hint:
+        st.caption(deselect_hint)
     st.dataframe(open_cases[open_columns], width="stretch", hide_index=True)
 
 with tab_records:

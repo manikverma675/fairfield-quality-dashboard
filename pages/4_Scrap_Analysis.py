@@ -94,46 +94,60 @@ col4.metric(
 col5.metric("Items", f"{summary['items']:,}")
 col6.metric("Transactions", f"{summary['transactions']:,}")
 st.caption(
-    "Confirmed Scrap = units that left quarantine as waste. "
-    "Into Quarantine = units flagged as potential scrap. "
-    "Quarantine Balance = units still sitting in quarantine (Into − Confirmed). "
+    "Confirmed Scrap = units formally written off as waste (negative-quantity transactions only). "
+    "Into Quarantine = units moved into the quarantine location (positive-quantity transactions). "
+    "Quarantine Balance = Into − Confirmed; includes both pending-discard units AND non-waste items "
+    "that permanently live in quarantine (e.g. RFID tags) — not all balance is true scrap risk. "
     "Confirmation Rate = Confirmed Scrap / Into Quarantine for the latest period."
 )
 
 with st.expander("Formulas & Methodology"):
     st.markdown("""
-**Field Definitions**
-| Field | Definition |
+**How the quarantine flow works**
+
+Each row in the source file is one inventory transaction. When a unit is suspected defective it is moved into a quarantine location (positive quantity). When it is formally written off it exits quarantine as confirmed scrap (negative quantity). The dashboard derives four measures from the raw quantity field:
+
+| Field | How it is calculated |
 |---|---|
-| Confirmed Scrap | Units formally written off as waste — they left quarantine as scrap |
-| Into Quarantine | Units flagged as suspect and moved into quarantine for review |
-| Quarantine Balance | Into Quarantine − Confirmed Scrap (units still pending final disposition) |
-| Absolute Movement | \|Quantity\| of each transaction regardless of direction (in or out) |
+| Into Quarantine | Units moved **into** quarantine — the positive-quantity transactions only. These are units pulled from normal inventory because something looked wrong. |
+| Confirmed Scrap | Units **written off** as waste — the absolute value of the negative-quantity transactions. These are units that have been permanently discarded after review. |
+| Quarantine Balance | *Into Quarantine − Confirmed Scrap* summed per item. The balance is made up of **two very different populations**: (1) products with a pending discard decision — units flagged as defective that have not yet been formally written off; and (2) items that live in the quarantine location permanently and are **not** waste (for example, RFID tags that are stored there as part of normal operations and are never expected to be scrapped). Because of the second group, a high or growing Quarantine Balance does not always mean a quality problem — it may simply reflect non-scrap items accumulating in the quarantine bin. Only items that have at least one negative-quantity transaction (a confirmed scrap write-off) can be treated as true scrap candidates. |
+| Absolute Movement | \|Quantity\| for every transaction regardless of direction. Useful for measuring total activity volume when you don't care about the in-vs-out split. |
+
+---
 
 **Metric Cards**
-| Metric | Formula |
+
+| Metric | How it is calculated |
 |---|---|
-| Confirmed Scrap | SUM(Confirmed Scrap) over filtered transactions |
-| Into Quarantine | SUM(Into Quarantine) over filtered transactions |
-| Quarantine Balance | SUM(Quarantine Balance) over filtered transactions |
-| Confirmation Rate | Confirmed Scrap ÷ Into Quarantine — calculated for the **most recent period** only |
-| Items | COUNT DISTINCT items appearing in filtered transactions |
-| Transactions | COUNT of individual transaction rows |
+| Confirmed Scrap | Sum of all confirmed-scrap units across every transaction in the filtered date and item range. |
+| Into Quarantine | Sum of all units moved into quarantine in the filtered range. |
+| Quarantine Balance | Sum of (Into Quarantine − Confirmed Scrap) across the filtered transactions. This number includes both true pending-discard units **and** non-waste items that permanently reside in the quarantine location (e.g. RFID tags). Interpret it alongside Confirmed Scrap rather than in isolation. |
+| Confirmation Rate | *Confirmed Scrap ÷ Into Quarantine*, calculated using only the numbers from the **most recent period** on the chart. Tells you what fraction of quarantined units are actually being written off as scrap right now. A rate below 1.0 means more units are going in than are being resolved. |
+| Items | Count of distinct item codes that appear in at least one transaction in the filtered set. |
+| Transactions | Total number of individual transaction rows after filtering. |
+
+---
 
 **Trend Charts**
-| Chart | Formula |
+
+| Chart | How it is calculated |
 |---|---|
-| Selected Measure by Period | SUM of the chosen measure (sidebar radio) grouped by the selected period grain |
-| Rolling Average | 4-period rolling mean of the selected measure — uses `min_periods=1` so early periods are not blank |
-| Confirmed Scrap vs Into Quarantine | Both series summed per period — Confirmed Scrap can exceed Into Quarantine in a period because items quarantined earlier may be confirmed later |
+| Selected Measure by Period | For each period (week/month/etc.), sums whichever measure you selected in the sidebar radio button. Shows how that measure changes over time. |
+| Rolling Average | For each period, takes the average of that period's value plus the three periods immediately before it (a 4-period rolling window). This smooths out short-term noise and makes the underlying trend easier to see. The first period uses whatever data is available rather than leaving it blank. |
+| Confirmed Scrap vs Into Quarantine | Both series summed per period on the same chart. When Confirmed Scrap is higher than Into Quarantine in a given period, it means units quarantined in **earlier** periods are being written off now in a batch — the two flows don't have to balance within any single period. |
+| Cumulative Confirmed Scrap vs Into Quarantine | The same two series shown as running totals from the start of the selected date range. When the orange (Confirmed Scrap) line rises above blue (Into Quarantine), it means those units were quarantined before the current date window — their quarantine entry is not in the visible range but the scrap write-off is. Where blue sits above orange, the gap is units still in quarantine waiting for a final decision. |
+
+---
 
 **Items Tab**
-| Chart | Formula |
-|---|---|
-| Item Trend | SUM of chosen measure per item per period |
-| Top Items | SUM of chosen measure per item, ranked descending — top N controlled by the slider |
 
-*Note: Quarantine Balance can be negative in a period if more units were confirmed than entered quarantine that period (prior-period stock being cleared).*
+| Chart | How it is calculated |
+|---|---|
+| Item Trend | Shows only items whose net *Quarantine Balance* (Into Quarantine − Confirmed Scrap, summed across all their transactions) is **negative** — meaning more units were taken out of inventory as scrap than were ever put into quarantine. For each of those items, the chosen measure is summed per period and drawn as a separate line. |
+| Top Items | Same negative-balance filter as Item Trend. Items where the net balance is zero or positive (more units going in than coming out) are excluded. The remaining items are ranked from highest to lowest by the chosen measure. The slider controls how many appear. |
+
+*Note: Quarantine Balance can show as negative for a period if more units were confirmed scrap than entered quarantine in that same period — this happens when older quarantine stock is cleared in bulk.*
 """)
 
 tab_trend, tab_items, tab_records = st.tabs(["Trend", "Items", "Records"])
@@ -215,10 +229,56 @@ with tab_trend:
             "The overall rate in the headline card is the meaningful figure."
         )
 
+        cumulative = rate_trend[["Period", "Confirmed Scrap", "Into Quarantine"]].copy()
+        cumulative["Confirmed Scrap"] = cumulative["Confirmed Scrap"].cumsum()
+        cumulative["Into Quarantine"] = cumulative["Into Quarantine"].cumsum()
+        cumulative_data = cumulative.melt(
+            id_vars=["Period"],
+            value_vars=["Confirmed Scrap", "Into Quarantine"],
+            var_name="Flow",
+            value_name="Units",
+        )
+        cumulative_chart = (
+            alt.Chart(cumulative_data)
+            .mark_line(point=True, strokeWidth=2)
+            .encode(
+                x=alt.X("Period:T", title=None),
+                y=alt.Y("Units:Q", title="Cumulative Units"),
+                color=alt.Color(
+                    "Flow:N",
+                    scale=alt.Scale(
+                        domain=["Confirmed Scrap", "Into Quarantine"],
+                        range=[CHART_ORANGE, CHART_BLUE],
+                    ),
+                ),
+                tooltip=[
+                    alt.Tooltip("Period:T", title="Period"),
+                    alt.Tooltip("Flow:N"),
+                    alt.Tooltip("Units:Q", format=",.0f", title="Cumulative Units"),
+                ],
+            )
+            .properties(
+                title=f"Cumulative Confirmed Scrap vs Into Quarantine",
+                height=300,
+            )
+        )
+        st.altair_chart(cumulative_chart, width="stretch")
+        st.caption(
+            "Cumulative totals running from the start of the selected date range. "
+            "When the orange (Confirmed Scrap) line rises above blue (Into Quarantine), "
+            "it means those units were quarantined before the selected date range begins — "
+            "their quarantine entry is not visible in this window but the scrap write-off is. "
+            "The vertical gap where blue is above orange represents units still sitting in quarantine."
+        )
+
 with tab_items:
-    item_summary = scrap_item_summary(filtered, measure_col, limit=top_n)
+    item_balance = filtered.groupby("Item")["Quarantine Balance"].sum()
+    negative_balance_items = set(item_balance[item_balance < 0].index)
+    items_out = filtered[filtered["Item"].isin(negative_balance_items)]
+
+    item_summary = scrap_item_summary(items_out, measure_col, limit=top_n)
     trend_items = selected_items if selected_items else item_summary["Item"].tolist()
-    item_trend = scrap_item_trend(filtered, grain, measure_col, trend_items)
+    item_trend = scrap_item_trend(items_out, grain, measure_col, trend_items)
 
     if not item_trend.empty:
         item_chart = (
