@@ -140,15 +140,14 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 
 | Chart | How it is calculated |
 |---|---|
-| Item Trend | Shows only items whose net *Quarantine Balance* (Into Quarantine − Confirmed Scrap, summed across all their transactions) is **negative** — meaning more units were taken out of inventory as scrap than were ever put into quarantine. For each of those items, the chosen measure is summed per period and drawn as a separate line. |
-| Top Items | Same negative-balance filter as Item Trend. Items where the net balance is zero or positive (more units going in than coming out) are excluded. The remaining items are ranked from highest to lowest by the chosen measure. The slider controls how many appear. |
+| Item Trend | Shows only items that have been **confirmed as scrap at least once** — i.e., items with at least one negative-quantity write-off transaction. Items that only ever moved into quarantine and were never written off (e.g. RFID tags) are excluded. For each qualifying item, the chosen measure is summed per period and drawn as a separate line. |
+| Top Items | Same filter as Item Trend — only items with at least one confirmed scrap write-off. Ranked from highest to lowest by the chosen measure. The slider controls how many appear. |
 
 *Note: Quarantine Balance can show as negative for a period if more units were confirmed scrap than entered quarantine in that same period — this happens when older quarantine stock is cleared in bulk.*
 """)
 
-item_balance = filtered.groupby("Item")["Quarantine Balance"].sum()
-negative_balance_items = set(item_balance[item_balance < 0].index)
-items_out = filtered[filtered["Item"].isin(negative_balance_items)]
+scrapped_items = set(filtered[filtered["Confirmed Scrap"] > 0]["Item"].unique())
+items_out = filtered[filtered["Item"].isin(scrapped_items)]
 
 tab_trend, tab_items, tab_records = st.tabs(["Trend", "Items", "Records"])
 
