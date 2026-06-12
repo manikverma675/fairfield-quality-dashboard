@@ -48,7 +48,8 @@ reasons = sorted(top_claims["Claim Reason"].dropna().unique())
 with st.sidebar:
     st.header("Filters")
     selected_reasons = st.multiselect("Claim reason", reasons, default=[])
-    top_n = st.slider("Top items shown", 5, 30, 15)
+    _top_n_label = st.selectbox("Top items shown", [10, 15, 20, 25, 30, 50, 75, 100, "All"], index=1)
+    top_n = None if _top_n_label == "All" else _top_n_label
 
 filtered_claims = top_claims.copy()
 if selected_reasons:
@@ -108,7 +109,7 @@ The dollar gap between *Dept Summary Total* and *Top Items Cost* is money that A
 |---|---|
 | Claim Cost by Reason | Groups every row in the Line-Item Detail tab by *Claim Reason* and sums their *Claim Amount*. Shows which type of claim (e.g. damaged, defective, shortage) is costing the most money. |
 | Claim Cost by Department | Groups the Department Summary tab by *Department Description* and sums *Claim Amount* per department. Shows which product departments are generating the most claim dollars according to Amazon's own rolled-up report. |
-| Top Items by Claim Cost | Groups the Line-Item Detail tab by *Item Description*, sums *Claim Amount* per item, and ranks from highest to lowest. Shows which specific products are responsible for the most claim dollars in the detail sheet. The slider controls how many items appear. |
+| Top Items by Claim Cost | Groups the Line-Item Detail tab by *Item Description*, sums *Claim Amount* per item, and ranks from highest to lowest. Shows which specific products are responsible for the most claim dollars in the detail sheet. The dropdown controls how many items appear — select **All** to show every item. |
 """)
 
 tab_cost, tab_items, tab_records = st.tabs(["Cost", "Items", "Records"])

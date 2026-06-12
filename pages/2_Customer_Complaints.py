@@ -59,7 +59,8 @@ with st.sidebar:
     )
     selected_statuses = st.multiselect("Status", statuses, default=[])
     selected_companies = st.multiselect("Company", companies, default=[])
-    top_n = st.slider("Top companies shown", 5, 25, 12)
+    _top_n_label = st.selectbox("Top companies shown", [10, 15, 20, 25, 30, 50, 75, 100, "All"], index=1)
+    top_n = None if _top_n_label == "All" else _top_n_label
 
 if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
     start_date, end_date = selected_dates
@@ -114,7 +115,7 @@ This page filters the NCR Cases file to only rows where **Profile = "FPC | NCR"*
 |---|---|
 | Open / Closed by Period | Complaints are grouped by the month/week/quarter their *Date Created* falls in, then split into two lines: the orange line counts cases from that period whose current *Status* is still open (Escalated), and the blue line counts cases whose *Stage* = "Closed". Both lines track cases by when they were opened, not when they were closed. |
 | Complaint Status | Groups all filtered complaints by their current *Status* value and counts how many are in each status. |
-| Top Companies | Groups all filtered complaints by *Company*, counts how many complaints each company has generated, and ranks from most to least. The slider controls how many companies appear. |
+| Top Companies | Groups all filtered complaints by *Company*, counts how many complaints each company has generated, and ranks from most to least. The dropdown controls how many companies appear — select **All** to show every company. |
 
 ---
 

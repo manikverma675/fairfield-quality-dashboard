@@ -62,7 +62,8 @@ with st.sidebar:
     selected_items = st.multiselect("Include items", items, default=[])
     excluded_items = st.multiselect("Exclude items", items, default=[])
     selected_locations = st.multiselect("Location", locations, default=[])
-    top_n = st.slider("Top items shown", 5, 30, 15)
+    _top_n_label = st.selectbox("Top items shown", [10, 15, 20, 25, 30, 50, 75, 100, "All"], index=1)
+    top_n = None if _top_n_label == "All" else _top_n_label
 
 if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
     start_date, end_date = selected_dates
@@ -141,7 +142,7 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 | Chart | How it is calculated |
 |---|---|
 | Item Trend | Shows only items that have been **confirmed as scrap at least once** — i.e., items with at least one negative-quantity write-off transaction. Items that only ever moved into quarantine and were never written off (e.g. RFID tags) are excluded. For each qualifying item, the chosen measure is summed per period and drawn as a separate line. |
-| Top Items | Same filter as Item Trend — only items with at least one confirmed scrap write-off. Ranked from highest to lowest by the chosen measure. The slider controls how many appear. |
+| Top Items | Same filter as Item Trend — only items with at least one confirmed scrap write-off. Ranked from highest to lowest by the chosen measure. The dropdown controls how many appear — select **All** to show every item. |
 
 *Note: Quarantine Balance can show as negative for a period if more units were confirmed scrap than entered quarantine in that same period — this happens when older quarantine stock is cleared in bulk.*
 """)

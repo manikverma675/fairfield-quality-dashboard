@@ -126,10 +126,10 @@ def ncr_status_summary(cases: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def ncr_company_summary(cases: pd.DataFrame, limit: int = 15) -> pd.DataFrame:
+def ncr_company_summary(cases: pd.DataFrame, limit: int | None = 15) -> pd.DataFrame:
     if cases.empty:
         return pd.DataFrame(columns=["Company", "Cases", "Open Cases"])
-    return (
+    result = (
         cases.groupby("Company", as_index=False)
         .agg(
             **{
@@ -138,8 +138,8 @@ def ncr_company_summary(cases: pd.DataFrame, limit: int = 15) -> pd.DataFrame:
             }
         )
         .sort_values("Cases", ascending=False)
-        .head(limit)
     )
+    return result if limit is None else result.head(limit)
 
 
 def open_case_aging(cases: pd.DataFrame) -> pd.DataFrame:
@@ -231,11 +231,11 @@ def scrap_rate_trend(scrap: pd.DataFrame, grain: str) -> pd.DataFrame:
     return trend
 
 
-def scrap_item_summary(scrap: pd.DataFrame, measure_col: str, limit: int = 15) -> pd.DataFrame:
+def scrap_item_summary(scrap: pd.DataFrame, measure_col: str, limit: int | None = 15) -> pd.DataFrame:
     if scrap.empty:
         return pd.DataFrame(columns=["Item", measure_col, "Transactions", "First Date", "Last Date"])
 
-    return (
+    result = (
         scrap.groupby("Item", as_index=False)
         .agg(
             **{
@@ -246,8 +246,8 @@ def scrap_item_summary(scrap: pd.DataFrame, measure_col: str, limit: int = 15) -
             }
         )
         .sort_values(measure_col, ascending=False)
-        .head(limit)
     )
+    return result if limit is None else result.head(limit)
 
 
 def scrap_item_trend(
@@ -495,19 +495,20 @@ def claims_by_reason(top_claims: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def claims_by_item(top_claims: pd.DataFrame, limit: int = 15) -> pd.DataFrame:
+def claims_by_item(top_claims: pd.DataFrame, limit: int | None = 15) -> pd.DataFrame:
     if top_claims.empty:
         return pd.DataFrame(columns=["Item Description", "Claims", "Claim Amount"])
-    return (
+    result = (
         top_claims.groupby("Item Description", as_index=False)
         .agg(**{"Claims": ("UPC", "count"), "Claim Amount": ("Claim Amount", "sum")})
         .sort_values("Claim Amount", ascending=False)
-        .head(limit)
     )
+    return result if limit is None else result.head(limit)
 
 
-def defective_damage_summary(defective_damaged: pd.DataFrame, limit: int = 15) -> pd.DataFrame:
+def defective_damage_summary(defective_damaged: pd.DataFrame, limit: int | None = 15) -> pd.DataFrame:
     if defective_damaged.empty:
         return pd.DataFrame(columns=["Item Description", "Total Claim $", "Total Units"])
     columns = ["Item Description", "Total Claim $", "Total Units"]
-    return defective_damaged[columns].sort_values("Total Claim $", ascending=False).head(limit)
+    result = defective_damaged[columns].sort_values("Total Claim $", ascending=False)
+    return result if limit is None else result.head(limit)

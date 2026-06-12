@@ -61,7 +61,8 @@ with st.sidebar:
     )
     selected_statuses = st.multiselect("Status", statuses, default=[])
     selected_assignees = st.multiselect("Assigned to", assignees, default=[])
-    top_n = st.slider("Top companies shown", 5, 25, 12)
+    _top_n_label = st.selectbox("Top companies shown", [10, 15, 20, 25, 30, 50, 75, 100, "All"], index=1)
+    top_n = None if _top_n_label == "All" else _top_n_label
 
 if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
     start_date, end_date = selected_dates
@@ -125,7 +126,7 @@ with st.expander("Formulas & Methodology"):
 | Chart | How it is calculated |
 |---|---|
 | Open NCR Aging | Looks only at cases with an open status (Escalated). For each, *Today − Date Created* is calculated. Cases are placed into six age buckets: **0–7 days** (just opened), **8–30 days** (recent), **31–60 days** (aging), **61–90 days** (old), **91–180 days** (very old), **181+ days** (critical). Taller bars mean more open cases in that age range. Click a bar to filter the table below to just those cases. |
-| Top NCR Companies | Looks only at open (Escalated) cases and groups them by *Company*, counts how many open cases each company has, and displays the top N ranked from most to least. The slider in the sidebar controls how many companies appear. Click a bar to filter the open backlog table to just that company's cases. |
+| Top NCR Companies | Looks only at open (Escalated) cases and groups them by *Company*, counts how many open cases each company has, and displays the top N ranked from most to least. The dropdown in the sidebar controls how many companies appear — select **All** to show every company. Click a bar to filter the open backlog table to just that company's cases. |
 """)
 
 tab_trend, tab_backlog, tab_records = st.tabs(["Trend", "Backlog", "Records"])
