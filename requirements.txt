@@ -4,3 +4,4 @@ altair
 openpyxl
 openai
 requests
+duckdb
