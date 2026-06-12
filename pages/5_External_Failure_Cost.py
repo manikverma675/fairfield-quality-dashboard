@@ -72,6 +72,37 @@ st.caption(
     "† Defect/Damage figures are not filterable by claim reason."
 )
 
+with st.expander("Formulas & Methodology"):
+    st.markdown("""
+**Data Sources** — this page draws from three separate sheets in the source file:
+
+| Source | Used For |
+|---|---|
+| Department Summary sheet | Dept Summary Total — Amazon's own rolled-up total by department |
+| Line-Item Detail sheet | Top Items Cost, Claim Lines, and the reason/item charts — filterable by claim reason |
+| Defective & Damaged sheet | Defect/Damage Cost and Units — separate product-level breakdown, not linked to reason filter |
+
+**Metric Cards**
+| Metric | Formula |
+|---|---|
+| Dept Summary Total | SUM(*Claim Amount*) from the Department Summary sheet — **not affected by any filter** |
+| Top Items Cost | SUM(*Claim Amount*) from the Line-Item Detail sheet, filtered by selected claim reason(s) |
+| Claim Lines | COUNT of rows in the Line-Item Detail sheet after filtering |
+| Defect/Damage Cost † | SUM(*Total Claim $*) from the Defective & Damaged sheet |
+| Defect/Damage Units † | SUM(*Total Units*) from the Defective & Damaged sheet |
+
+† These figures come from a separate sheet and are **not affected by the claim reason filter**.
+
+The gap between *Dept Summary Total* and *Top Items Cost* represents claims that appear in the department summary but have no matching line in the detail sheet.
+
+**Charts**
+| Chart | Formula |
+|---|---|
+| Claim Cost by Reason | SUM(*Claim Amount*) from the Line-Item sheet, grouped by *Claim Reason* |
+| Claim Cost by Department | SUM(*Claim Amount*) from the Department Summary sheet, grouped by *Department Description* |
+| Top Items by Claim Cost | SUM(*Claim Amount*) from the Line-Item sheet, grouped by *Item Description*, ranked descending |
+""")
+
 tab_cost, tab_items, tab_records = st.tabs(["Cost", "Items", "Records"])
 
 with tab_cost:

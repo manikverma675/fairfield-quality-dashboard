@@ -85,6 +85,33 @@ col3.metric("Closed", f"{summary['closed']:,}")
 col4.metric("Median Closure Days", format_number(summary["median_closure_days"]))
 col5.metric("Avg Open Age Days", format_number(summary["avg_age_days"]))
 
+with st.expander("Formulas & Methodology"):
+    st.markdown("""
+**Metric Cards**
+| Metric | Formula |
+|---|---|
+| NCR Cases | COUNT of all NCR cases matching the selected filters |
+| Open Backlog | COUNT of cases where *Date Closed* is blank |
+| Closed | COUNT of cases where *Date Closed* is filled |
+| Median Closure Days | MEDIAN(*Closure Days*) for closed cases in the filtered set |
+| Avg Open Age Days | AVERAGE(*Age Days*) for open cases (no close date) |
+
+**Trend Charts**
+| Chart | Formula |
+|---|---|
+| NCRs Created by Period | COUNT of cases grouped by *Date Created*, bucketed into the selected period grain |
+| Median Closure Time by Period | MEDIAN(*Closure Days*) for cases whose *Date Closed* falls in each period |
+| NCR Cases by Status | COUNT of cases grouped by *Status* value |
+
+**Backlog Charts**
+| Chart | Formula |
+|---|---|
+| Open NCR Aging | Open cases bucketed by *Age Days*: 0–7 · 8–30 · 31–60 · 61–90 · 91–180 · 181+ days |
+| Top NCR Companies | COUNT of cases grouped by *Company*, ranked descending — top N controlled by the slider |
+
+**Data scope:** Profile = "FPC | NCR". *Age Days* and *Closure Days* are computed in the source file (today − Date Created / Date Closed − Date Created).
+""")
+
 tab_trend, tab_backlog, tab_records = st.tabs(["Trend", "Backlog", "Records"])
 
 with tab_trend:

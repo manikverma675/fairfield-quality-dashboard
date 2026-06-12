@@ -81,6 +81,35 @@ col2.metric("Open", f"{summary['open']:,}")
 col3.metric("Closed", f"{summary['closed']:,}")
 col4.metric("Median Closure Days", format_number(summary["median_closure_days"]))
 
+with st.expander("Formulas & Methodology"):
+    st.markdown("""
+**Case Definition**
+
+Customer Complaints are NCR cases where **Profile = "FPC | NCR"** AND **Assigned To = "Sheri King"**. All other NCR cases are excluded from this view.
+
+**Metric Cards**
+| Metric | Formula |
+|---|---|
+| Complaints | COUNT of all complaint cases matching the selected filters |
+| Open | COUNT of cases where *Date Closed* is blank |
+| Closed | COUNT of cases where *Date Closed* is filled |
+| Median Closure Days | MEDIAN(*Closure Days*) for closed complaints in the filtered set |
+
+**Trend Charts**
+| Chart | Formula |
+|---|---|
+| Open / Closed by Period | COUNT of complaints grouped by *Date Created* period, split into Open (no close date) vs Closed |
+| Complaint Status | COUNT grouped by *Status* value |
+| Top Companies | COUNT grouped by *Company*, ranked descending — top N controlled by the slider |
+
+**Backlog**
+| Chart | Formula |
+|---|---|
+| Open Complaint Aging | Open cases bucketed by *Age Days*: 0–7 · 8–30 · 31–60 · 61–90 · 91–180 · 181+ days |
+
+*Age Days* and *Closure Days* are computed in the source file (today − Date Created / Date Closed − Date Created).
+""")
+
 tab_trend, tab_backlog, tab_records = st.tabs(["Trend", "Backlog", "Records"])
 
 with tab_trend:

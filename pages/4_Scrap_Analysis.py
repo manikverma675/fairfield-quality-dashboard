@@ -100,6 +100,42 @@ st.caption(
     "Confirmation Rate = Confirmed Scrap / Into Quarantine for the latest period."
 )
 
+with st.expander("Formulas & Methodology"):
+    st.markdown("""
+**Field Definitions**
+| Field | Definition |
+|---|---|
+| Confirmed Scrap | Units formally written off as waste — they left quarantine as scrap |
+| Into Quarantine | Units flagged as suspect and moved into quarantine for review |
+| Quarantine Balance | Into Quarantine − Confirmed Scrap (units still pending final disposition) |
+| Absolute Movement | \|Quantity\| of each transaction regardless of direction (in or out) |
+
+**Metric Cards**
+| Metric | Formula |
+|---|---|
+| Confirmed Scrap | SUM(Confirmed Scrap) over filtered transactions |
+| Into Quarantine | SUM(Into Quarantine) over filtered transactions |
+| Quarantine Balance | SUM(Quarantine Balance) over filtered transactions |
+| Confirmation Rate | Confirmed Scrap ÷ Into Quarantine — calculated for the **most recent period** only |
+| Items | COUNT DISTINCT items appearing in filtered transactions |
+| Transactions | COUNT of individual transaction rows |
+
+**Trend Charts**
+| Chart | Formula |
+|---|---|
+| Selected Measure by Period | SUM of the chosen measure (sidebar radio) grouped by the selected period grain |
+| Rolling Average | 4-period rolling mean of the selected measure — uses `min_periods=1` so early periods are not blank |
+| Confirmed Scrap vs Into Quarantine | Both series summed per period — Confirmed Scrap can exceed Into Quarantine in a period because items quarantined earlier may be confirmed later |
+
+**Items Tab**
+| Chart | Formula |
+|---|---|
+| Item Trend | SUM of chosen measure per item per period |
+| Top Items | SUM of chosen measure per item, ranked descending — top N controlled by the slider |
+
+*Note: Quarantine Balance can be negative in a period if more units were confirmed than entered quarantine that period (prior-period stock being cleared).*
+""")
+
 tab_trend, tab_items, tab_records = st.tabs(["Trend", "Items", "Records"])
 
 with tab_trend:

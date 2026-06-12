@@ -133,6 +133,36 @@ st.caption(
     f"{summary['measurements']:,}. Expected unknown or unparsed: {summary['expected_unknown']:,}."
 )
 
+with st.expander("Formulas & Methodology"):
+    st.markdown("""
+**Derived Fields** *(computed per measurement row)*
+| Field | Formula |
+|---|---|
+| Variance | Actual Weight − Expected Target |
+| Absolute Variance | \|Actual Weight − Expected Target\| |
+| Weight Status | **Within Range** if Actual falls inside the tolerance band around Expected Target; **Below Range / Below Expected** if under; **Above Range / Above Expected** if over; **Expected Unknown** if no parseable target exists |
+
+A measurement is **comparable** only when *Expected Target* is known and parseable. Non-comparable rows are counted but excluded from all variance calculations.
+
+**Metric Cards**
+| Metric | Formula |
+|---|---|
+| Avg Variance | AVERAGE(Variance) over comparable measurements — positive and negative errors can cancel |
+| Avg Abs Variance | AVERAGE(\|Variance\|) — treats over and under equally; use this as the primary accuracy indicator |
+| Max Abs Variance | MAX(\|Variance\|) — worst single measurement in the filtered set |
+| Within Range | COUNT where Weight Status = "Within Range" |
+| Below Expected | COUNT where Weight Status is "Below Range" or "Below Expected" |
+| Above Expected | COUNT where Weight Status is "Above Range" or "Above Expected" |
+
+**Charts**
+| Chart | Formula |
+|---|---|
+| Measured vs Expected (scatter) | Each point = one measurement. X-axis = Expected Target, Y-axis = Actual Weight. The dashed diagonal = perfect agreement (Variance = 0). Points above the line are heavier than expected; below are lighter. |
+| Avg Absolute Variance by Period | AVERAGE(\|Variance\|) for comparable measurements grouped by the selected period grain |
+| Work Orders by Avg Abs Variance | AVERAGE(\|Variance\|) per work order, ranked highest first — highlights the most variable production runs |
+| Assembly Items by Avg Abs Variance | AVERAGE(\|Variance\|) per assembly item, ranked highest first |
+""")
+
 tab_compare, tab_work_orders, tab_items, tab_records = st.tabs(
     ["Expected vs Actual", "Work Orders", "Assembly Items", "Measurements"]
 )
