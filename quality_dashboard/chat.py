@@ -60,13 +60,19 @@ _WIDGET_CSS = """
     bottom: 90px;
     right: 24px;
     width: 400px;
+    height: 520px;
+    min-width: 320px;
+    min-height: 360px;
     max-width: calc(100vw - 48px);
+    max-height: calc(100vh - 120px);
     background: #fff;
     border: 1px solid #e7e5e4;
     border-radius: 16px;
     box-shadow: 0 8px 40px rgba(0,0,0,0.18);
     z-index: 1000000;
     padding: 0.6rem 0.9rem 0.9rem;
+    resize: both;
+    overflow: auto;
 }
 .st-key-fpc_card .fpc-title {
     font-weight: 600;
