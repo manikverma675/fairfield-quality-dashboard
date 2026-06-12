@@ -154,28 +154,27 @@ tab_trend, tab_items, tab_records = st.tabs(["Trend", "Items", "Records"])
 
 with tab_trend:
     trend = scrap_trend(filtered, grain, measure_col)
-    left, right = st.columns([4, 1])
-    with left:
-        st.altair_chart(
-            period_line_chart(
-                trend,
-                measure_col,
-                f"{measure_col} by {grain.lower()} period",
-                color=CHART_BLUE,
-                height=560,
-                extra_tooltips=[
-                    alt.Tooltip("Transactions:Q", format=","),
-                    alt.Tooltip("Items:Q", format=","),
-                ],
-            ),
-            width="stretch",
-        )
-    with right:
-        latest = trend.iloc[-1]
-        peak = trend.loc[trend[measure_col].idxmax()]
-        st.metric("Latest Period", format_number(latest[measure_col]))
-        st.metric("Peak Period", format_number(peak[measure_col]), peak["Period"].strftime("%Y-%m-%d"))
-        st.metric("Average per Period", format_number(trend[measure_col].mean()))
+    latest = trend.iloc[-1]
+    peak = trend.loc[trend[measure_col].idxmax()]
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Latest Period", format_number(latest[measure_col]))
+    m2.metric("Peak Period", format_number(peak[measure_col]), peak["Period"].strftime("%Y-%m-%d"))
+    m3.metric("Average per Period", format_number(trend[measure_col].mean()))
+
+    st.altair_chart(
+        period_line_chart(
+            trend,
+            measure_col,
+            f"{measure_col} by {grain.lower()} period",
+            color=CHART_BLUE,
+            height=620,
+            extra_tooltips=[
+                alt.Tooltip("Transactions:Q", format=","),
+                alt.Tooltip("Items:Q", format=","),
+            ],
+        ),
+        width="stretch",
+    )
 
 
 with tab_items:
