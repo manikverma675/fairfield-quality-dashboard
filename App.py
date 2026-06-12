@@ -1,6 +1,7 @@
 import streamlit as st
 
 from quality_dashboard.chat import render_chat_widget
+from quality_dashboard.data_fetcher import ensure_data_files
 from quality_dashboard.config import (
     DEFECT_FILE,
     EXTERNAL_FAILURE_FILE,
@@ -12,6 +13,7 @@ from quality_dashboard.ui import apply_theme
 
 st.set_page_config(page_title="Fairfield Quality Dashboard", layout="wide")
 apply_theme()
+ensure_data_files()
 
 
 def home():
