@@ -69,7 +69,8 @@ _WIDGET_CSS = """
     max-height: calc(100vh - 110px);
     background: #fff;
     border: 1px solid #e7e5e4;
-    border-radius: 16px;
+    /* square off the bottom-right corner so the resize grip is visible/grabbable */
+    border-radius: 16px 16px 4px 16px;
     box-shadow: 0 8px 40px rgba(0,0,0,0.18);
     z-index: 1000000;
     padding: 0.6rem 0.9rem 0.9rem;
@@ -77,6 +78,19 @@ _WIDGET_CSS = """
     overflow: auto !important;
     display: flex;
     flex-direction: column;
+}
+/* Bigger, clearly visible drag handle in the bottom-right corner */
+.st-key-fpc_card::after {
+    content: "";
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+    background:
+        linear-gradient(135deg, transparent 0 50%, #b45309 50% 60%, transparent 60% 70%, #b45309 70% 80%, transparent 80%);
+    z-index: 1000002;
 }
 /* Let the message list fill the card and push the input to the bottom.
    Streamlit wraps the keyed container in a stLayoutWrapper, so the flex
