@@ -56,23 +56,40 @@ _WIDGET_CSS = """
 
 /* Floating chat card */
 .st-key-fpc_card {
-    position: fixed;
-    bottom: 90px;
-    right: 24px;
+    position: fixed !important;
+    /* Anchor by top-left so the bottom-right resize handle follows the cursor.
+       calc() keeps it in the lower-right corner on first open. */
+    top: calc(100vh - 610px);
+    left: calc(100vw - 424px);
     width: 400px;
     height: 520px;
     min-width: 320px;
-    min-height: 360px;
+    min-height: 340px;
     max-width: calc(100vw - 48px);
-    max-height: calc(100vh - 120px);
+    max-height: calc(100vh - 110px);
     background: #fff;
     border: 1px solid #e7e5e4;
     border-radius: 16px;
     box-shadow: 0 8px 40px rgba(0,0,0,0.18);
     z-index: 1000000;
     padding: 0.6rem 0.9rem 0.9rem;
-    resize: both;
-    overflow: auto;
+    resize: both !important;
+    overflow: auto !important;
+    display: flex;
+    flex-direction: column;
+}
+/* Let the message list fill the card and push the input to the bottom.
+   Streamlit wraps the keyed container in a stLayoutWrapper, so the flex
+   growth has to go on that wrapper, not the inner block. */
+.st-key-fpc_card > [data-testid="stLayoutWrapper"]:has(.st-key-fpc_msgs) {
+    flex: 1 1 auto !important;
+    flex-grow: 1 !important;
+    min-height: 120px;
+    overflow: hidden;
+}
+.st-key-fpc_msgs {
+    height: 100%;
+    overflow-y: auto !important;
 }
 .st-key-fpc_card .fpc-title {
     font-weight: 600;
@@ -134,7 +151,7 @@ def render_chat_widget() -> None:
     with st.container(key="fpc_card"):
         st.markdown('<div class="fpc-title">FPC Quality Assistant</div>', unsafe_allow_html=True)
 
-        with st.container(key="fpc_msgs", height=340):
+        with st.container(key="fpc_msgs"):
             if not st.session_state["qa_messages"]:
                 st.caption(
                     "Ask anything about NCR cases, complaints, scrap, weight inspection, or "
