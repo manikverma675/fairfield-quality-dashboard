@@ -63,10 +63,7 @@ _SCRAP_COLUMNS = {
     "Date": "date",
     "Item": "item",
     "Quantity": "quantity",
-    "Into Quarantine": "into_quarantine",
     "Confirmed Scrap": "confirmed_scrap",
-    "Quarantine Balance": "quarantine_balance",
-    "Absolute Movement": "absolute_movement",
     "Type": "type",
     "User": "user",
     "Employee": "employee",
@@ -192,8 +189,10 @@ KEY DEFINITIONS AND GOTCHAS:
 - A case is OPEN when status = 'Escalated'; it is CLOSED when stage = 'Closed' and date_closed \
 is not null. closure_days and age_days are already computed per row; use median for typical \
 closure time (a few very slow cases skew the average).
-- scrap: a positive quantity is units moved INTO quarantine; confirmed_scrap holds the units \
-confirmed scrapped (already a positive number). Sum confirmed_scrap for scrap volume. There is \
+- scrap: the scrap table is ALREADY filtered to confirmed scrap only — rows where type = \
+'Inventory Adjustment', the location is quarantine, and the raw quantity was negative. Inventory \
+Transfers and other movement are excluded because they are not scrap. confirmed_scrap is the \
+units written off (a positive number = -quantity). Sum confirmed_scrap for scrap volume. There is \
 no shipment/order denominator anywhere, so a true scrap or complaint RATE cannot be computed — \
 say so if asked.
 - external_departments.claim_amount is the authoritative reported claim total per department \

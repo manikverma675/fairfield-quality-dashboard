@@ -135,13 +135,19 @@ def load_scrap_data(path: Path = SCRAP_FILE) -> pd.DataFrame:
 
     scrap = scrap.dropna(subset=["Date", "Item", "Quantity"]).copy()
     scrap["Item"] = scrap["Item"].astype(str).str.strip()
-    scrap["Into Quarantine"] = scrap["Quantity"].clip(lower=0)
-    scrap["Confirmed Scrap"] = -scrap["Quantity"].clip(upper=0)
-    scrap["Absolute Movement"] = scrap["Quantity"].abs()
-    scrap["Quarantine Balance"] = scrap["Quantity"]
-    # Keep legacy aliases so any external code using old names still works
-    scrap["Positive Scrap"] = scrap["Into Quarantine"]
-    scrap["Net Quantity"] = scrap["Quarantine Balance"]
+    scrap["Type"] = scrap["Type"].astype(str).str.strip()
+    scrap["Location"] = scrap["Location"].astype(str).str.strip()
+
+    # Scrap definition (per quality management): a transaction is real scrap only when it is an
+    # Inventory Adjustment, in the quarantine location, with a negative quantity. Inventory
+    # Transfers and other types are just stock movement, not scrap, so they are excluded here.
+    is_adjustment = scrap["Type"].str.casefold() == "inventory adjustment"
+    is_quarantine = scrap["Location"].str.contains("quarantine", case=False, na=False)
+    is_scrap = is_adjustment & is_quarantine & (scrap["Quantity"] < 0)
+    scrap = scrap[is_scrap].copy()
+
+    # Confirmed Scrap = magnitude of the negative adjustment (positive count of units written off).
+    scrap["Confirmed Scrap"] = -scrap["Quantity"]
     return scrap
 
 

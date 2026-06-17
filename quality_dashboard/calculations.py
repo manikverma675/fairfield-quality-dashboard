@@ -163,20 +163,16 @@ def scrap_summary(scrap: pd.DataFrame, measure_col: str) -> dict[str, float]:
             "measure_total": 0,
             "transactions": 0,
             "items": 0,
-            "quarantine_balance": 0,
-            "into_quarantine": 0,
             "confirmed_scrap": 0,
-            "absolute_movement": 0,
+            "largest_event": 0,
         }
 
     return {
         "measure_total": scrap[measure_col].sum(),
         "transactions": int(len(scrap)),
         "items": int(scrap["Item"].nunique()),
-        "quarantine_balance": scrap["Quarantine Balance"].sum(),
-        "into_quarantine": scrap["Into Quarantine"].sum(),
         "confirmed_scrap": scrap["Confirmed Scrap"].sum(),
-        "absolute_movement": scrap["Absolute Movement"].sum(),
+        "largest_event": scrap["Confirmed Scrap"].max(),
     }
 
 
@@ -197,37 +193,6 @@ def scrap_trend(scrap: pd.DataFrame, grain: str, measure_col: str) -> pd.DataFra
         .sort_values("Period")
     )
     trend["Rolling Average"] = trend[measure_col].rolling(window=4, min_periods=1).mean()
-    return trend
-
-
-def scrap_rate_trend(scrap: pd.DataFrame, grain: str) -> pd.DataFrame:
-    if scrap.empty:
-        return pd.DataFrame(
-            columns=[
-                "Period",
-                "Confirmed Scrap",
-                "Into Quarantine",
-                "Quarantine Balance",
-                "Scrap Confirmation Rate",
-                "Transactions",
-            ]
-        )
-
-    framed = add_period(scrap, "Date", grain)
-    trend = (
-        framed.groupby("Period", as_index=False)
-        .agg(
-            **{
-                "Confirmed Scrap": ("Confirmed Scrap", "sum"),
-                "Into Quarantine": ("Into Quarantine", "sum"),
-                "Quarantine Balance": ("Quarantine Balance", "sum"),
-                "Transactions": ("Id", "count"),
-            }
-        )
-        .sort_values("Period")
-    )
-    denominator = trend["Into Quarantine"].replace({0: pd.NA})
-    trend["Scrap Confirmation Rate"] = trend["Confirmed Scrap"] / denominator
     return trend
 
 

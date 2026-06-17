@@ -6,13 +6,12 @@ from quality_dashboard.calculations import (
     filter_by_date,
     scrap_item_summary,
     scrap_item_trend,
-    scrap_rate_trend,
     scrap_summary,
     scrap_trend,
 )
 from quality_dashboard.config import SCRAP_FILE
 from quality_dashboard.data_loaders import load_scrap_data
-from quality_dashboard.metrics import PERIOD_OPTIONS, date_bounds, format_number, format_percent
+from quality_dashboard.metrics import PERIOD_OPTIONS, date_bounds, format_number
 from quality_dashboard.ui import (
     CHART_BLUE,
     CHART_ORANGE,
@@ -41,18 +40,19 @@ if scrap.empty:
 
 render_header(
     "Scrap Analysis",
-    "Quarantine production reject movement by item, period, and transaction.",
+    "Confirmed scrap — negative inventory adjustments in quarantine — by item, period, and transaction.",
     SCRAP_FILE.name,
 )
 
-measure_options = ["Confirmed Scrap", "Into Quarantine", "Quarantine Balance", "Absolute Movement"]
+# Every measure on this page is confirmed scrap: units written off via negative Inventory
+# Adjustments in the quarantine location. load_scrap_data already applies that filter.
+measure_col = "Confirmed Scrap"
 min_date, max_date = date_bounds(scrap, "Date")
 items = sorted(scrap["Item"].dropna().unique())
 locations = sorted(scrap["Location"].dropna().unique()) if "Location" in scrap else []
 
 with st.sidebar:
     st.header("Filters")
-    measure_col = st.radio("Scrap measure", measure_options, index=0)
     grain = st.segmented_control("Period", PERIOD_OPTIONS, default="Weekly")
     selected_dates = st.date_input(
         "Transaction date range",
@@ -82,38 +82,31 @@ if filtered.empty:
     empty_state("No scrap records match the selected filters.")
 
 summary = scrap_summary(filtered, measure_col)
-rate_trend = scrap_rate_trend(filtered, grain)
-latest_rate = rate_trend.iloc[-1] if not rate_trend.empty else None
-col1, col2, col3, col4, col5, col6 = st.columns(6)
-col1.metric("Confirmed Scrap", format_number(summary["confirmed_scrap"]))
-col2.metric("Into Quarantine", format_number(summary["into_quarantine"]))
-col3.metric("Quarantine Balance", format_number(summary["quarantine_balance"]))
-col4.metric(
-    "Confirmation Rate",
-    format_percent(latest_rate["Scrap Confirmation Rate"] if latest_rate is not None else float("nan")),
-)
-col5.metric("Items", f"{summary['items']:,}")
-col6.metric("Transactions", f"{summary['transactions']:,}")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Scrap (units)", format_number(summary["confirmed_scrap"]))
+col2.metric("Scrap Transactions", f"{summary['transactions']:,}")
+col3.metric("Items Scrapped", f"{summary['items']:,}")
+col4.metric("Largest Single Scrap (units)", format_number(summary["largest_event"]))
 st.caption(
-    "Confirmed Scrap = units formally written off as waste (negative-quantity transactions only). "
-    "Into Quarantine = units moved into the quarantine location (positive-quantity transactions). "
-    "Quarantine Balance = Into − Confirmed; includes both pending-discard units AND non-waste items "
-    "that permanently live in quarantine (e.g. RFID tags) — not all balance is true scrap risk. "
-    "Confirmation Rate = Confirmed Scrap / Into Quarantine for the latest period."
+    "Scrap = units written off via a **negative Inventory Adjustment in the quarantine location**. "
+    "Inventory Transfers (stock simply moved in or out of quarantine) are excluded — they are movement, not scrap. "
+    "Confirmed Scrap is reported as a positive unit count (the magnitude of the negative adjustment). "
+    "Every card, chart, and table on this page reflects only these confirmed-scrap transactions."
 )
 
 with st.expander("Formulas & Methodology"):
     st.markdown("""
-**How the quarantine flow works**
+**What counts as scrap**
 
-Each row in the source file is one inventory transaction. When a unit is suspected defective it is moved into a quarantine location (positive quantity). When it is formally written off it exits quarantine as confirmed scrap (negative quantity). The dashboard derives four measures from the raw quantity field:
+Each row in the source file is one inventory transaction in the quarantine location. Most rows are **Inventory Transfers** — stock simply moved into or out of quarantine — and these are **not** scrap. A unit is only counted as scrap when it is **formally written off**, which in this data means:
+
+> **Type = Inventory Adjustment**  **AND**  **Location = quarantine**  **AND**  **Quantity < 0**
+
+`load_scrap_data` filters the file down to exactly those rows before anything on this page is calculated, so every card, chart, and table below reflects confirmed scrap only.
 
 | Field | How it is calculated |
 |---|---|
-| Into Quarantine | Units moved **into** quarantine — the positive-quantity transactions only. These are units pulled from normal inventory because something looked wrong. |
-| Confirmed Scrap | Units **written off** as waste — the absolute value of the negative-quantity transactions. These are units that have been permanently discarded after review. |
-| Quarantine Balance | *Into Quarantine − Confirmed Scrap* summed per item. The balance is made up of **two very different populations**: (1) products with a pending discard decision — units flagged as defective that have not yet been formally written off; and (2) items that live in the quarantine location permanently and are **not** waste (for example, RFID tags that are stored there as part of normal operations and are never expected to be scrapped). Because of the second group, a high or growing Quarantine Balance does not always mean a quality problem — it may simply reflect non-scrap items accumulating in the quarantine bin. Only items that have at least one negative-quantity transaction (a confirmed scrap write-off) can be treated as true scrap candidates. |
-| Absolute Movement | \|Quantity\| for every transaction regardless of direction. Useful for measuring total activity volume when you don't care about the in-vs-out split. |
+| Confirmed Scrap | The magnitude of the negative adjustment — `-Quantity` — reported as a **positive** count of units written off. This is the single measure used everywhere on the page. |
 
 ---
 
@@ -121,12 +114,10 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 
 | Metric | How it is calculated |
 |---|---|
-| Confirmed Scrap | Sum of all confirmed-scrap units across every transaction in the filtered date and item range. |
-| Into Quarantine | Sum of all units moved into quarantine in the filtered range. |
-| Quarantine Balance | Sum of (Into Quarantine − Confirmed Scrap) across the filtered transactions. This number includes both true pending-discard units **and** non-waste items that permanently reside in the quarantine location (e.g. RFID tags). Interpret it alongside Confirmed Scrap rather than in isolation. |
-| Confirmation Rate | *Confirmed Scrap ÷ Into Quarantine*, calculated using only the numbers from the **most recent period** on the chart. *Example: 80 units written off ÷ 100 units quarantined = 0.80 (80%).* Tells you what fraction of quarantined units are actually being written off as scrap right now. A rate below 1.0 means more units are going in than are being resolved. |
-| Items | Count of distinct item codes that appear in at least one transaction in the filtered set. |
-| Transactions | Total number of individual transaction rows after filtering. |
+| Total Scrap (units) | Sum of Confirmed Scrap across every scrap transaction in the filtered date and item range. |
+| Scrap Transactions | Number of confirmed-scrap transaction rows after filtering. |
+| Items Scrapped | Count of distinct item codes that were scrapped at least once in the filtered set. |
+| Largest Single Scrap (units) | The biggest single confirmed-scrap transaction in the filtered set. |
 
 ---
 
@@ -134,21 +125,19 @@ Each row in the source file is one inventory transaction. When a unit is suspect
 
 | Chart | How it is calculated |
 |---|---|
-| Selected Measure by Period | For each period (week/month/etc.), sums whichever measure you selected in the sidebar radio button. Shows how that measure changes over time. |
+| Confirmed Scrap by Period | For each period (week/month/etc.), sums the confirmed-scrap units. Shows how scrap volume changes over time, with a 4-period rolling average. |
 
 ---
 
 **Items Tab**
 
-*This whole tab uses only the **confirmed-scrap (negative-quantity) transactions** and always measures **Confirmed Scrap**, regardless of the sidebar measure. The sidebar measure applies to the Trend tab.*
-
 | Chart | How it is calculated |
 |---|---|
-| Item Trend | For each item that has been written off as scrap at least once, sums its confirmed-scrap units per period and draws a separate line. |
+| Item Trend | For each scrapped item, sums its confirmed-scrap units per period and draws a separate line. |
 | Top Items | Sums confirmed-scrap units per item across the filtered range and ranks highest to lowest. The dropdown controls how many appear — select **All** to show every item. **Click a bar to list that item's individual write-off transactions in a table below.** |
 """)
 
-items_out = filtered[filtered["Confirmed Scrap"] > 0]
+items_out = filtered
 
 tab_trend, tab_items, tab_records = st.tabs(["Trend", "Items", "Records"])
 
@@ -203,7 +192,7 @@ with tab_trend:
             (filtered["Date"] >= selected_ts) & (filtered["Date"] < period_end)
         ]
         drill_cols = ["Date", "Document Number", "Type", "Item", "Quantity",
-                      "Into Quarantine", "Confirmed Scrap", "Location", "Bin Number", "User", "Employee"]
+                      "Confirmed Scrap", "Location", "Bin Number", "User", "Employee"]
         st.subheader(f"Transactions — {selected_ts.strftime('%Y-%m-%d')} ({len(period_rows):,} rows)")
         st.caption("Click the same dot again to clear.")
         st.dataframe(
@@ -218,13 +207,7 @@ with tab_trend:
 
 
 with tab_items:
-    # The Items tab only contains confirmed-scrap (negative-quantity) rows, so the only
-    # measure that is meaningful here is Confirmed Scrap. Into Quarantine would be all zero
-    # and Quarantine Balance all negative. The sidebar measure still drives the Trend tab.
     items_measure = "Confirmed Scrap"
-    if measure_col != items_measure:
-        st.caption(f"This tab always uses **Confirmed Scrap** (the sidebar's *{measure_col}* applies to the Trend tab).")
-
     item_summary = scrap_item_summary(items_out, items_measure, limit=top_n)
     trend_items = selected_items if selected_items else item_summary["Item"].tolist()
     item_trend = scrap_item_trend(items_out, grain, items_measure, trend_items)
@@ -298,9 +281,7 @@ with tab_records:
         "Type",
         "Item",
         "Quantity",
-        "Into Quarantine",
         "Confirmed Scrap",
-        "Absolute Movement",
         "Location",
         "Bin Number",
         "User",
