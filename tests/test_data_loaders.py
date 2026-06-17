@@ -9,8 +9,8 @@ from quality_dashboard.calculations import (
     external_failure_summary,
     filter_ncr_profile,
     ncr_summary,
-    scrap_rate_trend,
     scrap_summary,
+    scrap_trend,
     weight_summary,
 )
 from quality_dashboard.config import (
@@ -78,26 +78,32 @@ class DataLoaderUnitTests(unittest.TestCase):
 
 
 class RealFileLoaderTests(unittest.TestCase):
-    def test_scrap_loader_normalizes_quantity_columns(self):
+    def test_scrap_loader_keeps_only_confirmed_scrap(self):
         scrap = load_scrap_data(SCRAP_FILE)
 
         self.assertFalse(scrap.empty)
         self.assertIn("Confirmed Scrap", scrap.columns)
-        self.assertIn("Into Quarantine", scrap.columns)
-        self.assertIn("Quarantine Balance", scrap.columns)
-        self.assertIn("Absolute Movement", scrap.columns)
-        self.assertGreaterEqual(scrap["Confirmed Scrap"].sum(), 0)
+
+        # Manager's definition: scrap is only negative Inventory Adjustments in quarantine.
+        self.assertTrue((scrap["Type"].str.casefold() == "inventory adjustment").all())
+        self.assertTrue(scrap["Location"].str.contains("quarantine", case=False).all())
+        self.assertTrue((scrap["Quantity"] < 0).all())
+        # Inventory Transfers must be excluded entirely.
+        self.assertFalse((scrap["Type"].str.casefold() == "inventory transfer").any())
+        # Confirmed Scrap is the positive magnitude of the negative quantity.
+        self.assertTrue((scrap["Confirmed Scrap"] > 0).all())
+        self.assertTrue((scrap["Confirmed Scrap"] == -scrap["Quantity"]).all())
 
         summary = scrap_summary(scrap, "Confirmed Scrap")
         self.assertGreater(summary["transactions"], 0)
         self.assertGreater(summary["items"], 0)
         self.assertGreater(summary["confirmed_scrap"], 0)
-        self.assertGreaterEqual(summary["quarantine_balance"], 0)
+        self.assertEqual(summary["confirmed_scrap"], scrap["Confirmed Scrap"].sum())
 
-        trend = scrap_rate_trend(scrap, "Monthly")
-        self.assertIn("Scrap Confirmation Rate", trend.columns)
-        self.assertFalse(trend["Scrap Confirmation Rate"].dropna().empty)
-        self.assertNotEqual(len(scrap_rate_trend(scrap, "Daily")), len(trend))
+        trend = scrap_trend(scrap, "Monthly", "Confirmed Scrap")
+        self.assertIn("Confirmed Scrap", trend.columns)
+        self.assertFalse(trend.empty)
+        self.assertNotEqual(len(scrap_trend(scrap, "Daily", "Confirmed Scrap")), len(trend))
 
     def test_defect_loader_extracts_actual_weight_measurements(self):
         measurements = load_defect_data(DEFECT_FILE)

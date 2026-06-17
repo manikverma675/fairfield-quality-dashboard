@@ -39,7 +39,7 @@ if top_claims.empty:
 
 render_header(
     "External Failure Cost",
-    "Amazon claim cost by reason, department, item, and defect/damage category.",
+    "Walmart claim cost by reason, department, item, and defect/damage category.",
     EXTERNAL_FAILURE_FILE.name,
 )
 
@@ -76,11 +76,11 @@ with st.expander("Formulas & Methodology"):
     st.markdown("""
 **Where the numbers come from**
 
-This page pulls from two separate tabs inside the source Excel file. They are independent Amazon reports and their totals will not exactly match each other — this is expected.
+This page pulls from two separate tabs inside the source Excel file. They are independent Walmart reports and their totals will not exactly match each other — this is expected.
 
 | Tab | What it contains | Affected by claim reason filter? |
 |---|---|---|
-| Department Summary | Amazon's rolled-up claim totals by department. One row per department. | No — always shows the full period total. |
+| Department Summary | Walmart's rolled-up claim totals by department. One row per department. | No — always shows the full period total. |
 | Line-Item Detail (Top Claimed Items) | Individual claim lines with one row per item per claim reason. This is the detail behind the department totals. | Yes — filtering by reason removes rows from this sheet only. |
 
 ---
@@ -95,7 +95,7 @@ This page pulls from two separate tabs inside the source Excel file. They are in
 | Defect/Damage Cost | Sum of *Claim Amount* for rows where Claim Reason is **Defective Merchandise** or **Damaged MD to 0**, after filtering. Shows how much of the total cost is driven by product quality and damage issues specifically. |
 | Defect/Damage Units | Count of claim lines where Claim Reason is **Defective Merchandise** or **Damaged MD to 0**, after filtering. |
 
-The dollar gap between *Dept Summary Total* and *Top Items Cost* is money that Amazon charged at the department level but did not break down to individual items in the detail sheet — for example, freight allowances or category-level deductions.
+The dollar gap between *Dept Summary Total* and *Top Items Cost* is money that Walmart charged at the department level but did not break down to individual items in the detail sheet — for example, freight allowances or category-level deductions.
 
 ---
 
@@ -104,7 +104,7 @@ The dollar gap between *Dept Summary Total* and *Top Items Cost* is money that A
 | Chart | How it is calculated |
 |---|---|
 | Claim Cost by Reason | Groups every row in the Line-Item Detail tab by *Claim Reason* and sums their *Claim Amount*. Shows which type of claim (e.g. damaged, defective, shortage) is costing the most money. Click a bar to list that reason's individual claim lines below. |
-| Claim Cost by Department | Groups the Department Summary tab by *Department Description* and sums *Claim Amount* per department. Shows which product departments are generating the most claim dollars according to Amazon's own rolled-up report. *(Not clickable — the detail sheet has no department column to drill into.)* |
+| Claim Cost by Department | Groups the Department Summary tab by *Department Description* and sums *Claim Amount* per department. Shows which product departments are generating the most claim dollars according to Walmart's own rolled-up report. *(Not clickable — the detail sheet has no department column to drill into.)* |
 | Top Items by Claim Cost | Groups the Line-Item Detail tab by *Item Description*, sums *Claim Amount* per item, and ranks from highest to lowest. Shows which specific products are responsible for the most claim dollars in the detail sheet. The dropdown controls how many items appear — select **All** to show every item. Click a bar to list that item's individual claim lines below. |
 """)
 
